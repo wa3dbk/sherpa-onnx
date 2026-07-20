@@ -177,6 +177,7 @@ or details.
   bool is_supertonic_tts = !config.model.supertonic.tts_json.empty();
   bool is_zipvoice_tts = !config.model.zipvoice.encoder.empty() &&
                          !config.model.zipvoice.decoder.empty();
+  bool is_omnivoice_tts = !config.model.omnivoice.model.empty();
 
   gen_config.sid = sid;
 
@@ -184,7 +185,7 @@ or details.
     gen_config.extra["lang"] = lang;
   }
 
-  if (is_pocket_tts || is_zipvoice_tts) {
+  if (is_pocket_tts || is_zipvoice_tts || is_omnivoice_tts) {
     if (reference_audio.empty()) {
       fprintf(stderr,
               "You need to provide --reference-audio for this TTS model");
@@ -204,10 +205,10 @@ or details.
     gen_config.reference_sample_rate = sample_rate;
   }
 
-  if (is_zipvoice_tts) {
+  if (is_zipvoice_tts || is_omnivoice_tts) {
     if (reference_text.empty()) {
       fprintf(stderr,
-              "You need to provide --reference-text for ZipVoice TTS");
+              "You need to provide --reference-text for this TTS model");
       SHERPA_ONNX_EXIT(EXIT_FAILURE);
     }
     gen_config.reference_text = reference_text;
@@ -250,3 +251,4 @@ or details.
 
   return 0;
 }
+

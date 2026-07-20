@@ -10,6 +10,7 @@
 #include "sherpa-onnx/csrc/offline-tts-kitten-model-config.h"
 #include "sherpa-onnx/csrc/offline-tts-kokoro-model-config.h"
 #include "sherpa-onnx/csrc/offline-tts-matcha-model-config.h"
+#include "sherpa-onnx/csrc/offline-tts-omnivoice-model-config.h"
 #include "sherpa-onnx/csrc/offline-tts-pocket-model-config.h"
 #include "sherpa-onnx/csrc/offline-tts-supertonic-model-config.h"
 #include "sherpa-onnx/csrc/offline-tts-vits-model-config.h"
@@ -26,6 +27,7 @@ struct OfflineTtsModelConfig {
   OfflineTtsKittenModelConfig kitten;
   OfflineTtsPocketModelConfig pocket;
   OfflineTtsSupertonicModelConfig supertonic;
+  OfflineTtsOmnivoiceModelConfig omnivoice;
 
   int32_t num_threads = 1;
   bool debug = false;
@@ -40,6 +42,7 @@ struct OfflineTtsModelConfig {
                         const OfflineTtsKittenModelConfig &kitten,
                         const OfflineTtsPocketModelConfig &pocket,
                         const OfflineTtsSupertonicModelConfig &supertonic,
+                        const OfflineTtsOmnivoiceModelConfig &omnivoice,
                         int32_t num_threads, bool debug,
                         const std::string &provider)
       : vits(vits),
@@ -49,6 +52,7 @@ struct OfflineTtsModelConfig {
         kitten(kitten),
         pocket(pocket),
         supertonic(supertonic),
+        omnivoice(omnivoice),
         num_threads(num_threads),
         debug(debug),
         provider(provider) {}
