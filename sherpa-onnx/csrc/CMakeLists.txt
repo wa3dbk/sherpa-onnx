@@ -301,6 +301,8 @@ if(SHERPA_ONNX_ENABLE_TTS)
     offline-tts-matcha-model-config.cc
     offline-tts-matcha-model.cc
     offline-tts-model-config.cc
+    offline-tts-omnivoice-model-config.cc
+    offline-tts-omnivoice-model.cc
     offline-tts-pocket-model-config.cc
     offline-tts-pocket-model.cc
     offline-tts-supertonic-impl.cc
