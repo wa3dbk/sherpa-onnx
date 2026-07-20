@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Copyright (c)  2026  Xiaomi Corporation
+#                2026  Waad Ben Kheder
 #
 # Build a ready-to-use OmniVoice bundle for sherpa-onnx.
 #

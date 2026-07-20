@@ -1,6 +1,7 @@
 // sherpa-onnx/csrc/offline-tts-omnivoice-model.h
 //
 // Copyright (c)  2026  Xiaomi Corporation
+//                2026  Waad Ben Kheder
 
 #ifndef SHERPA_ONNX_CSRC_OFFLINE_TTS_OMNIVOICE_MODEL_H_
 #define SHERPA_ONNX_CSRC_OFFLINE_TTS_OMNIVOICE_MODEL_H_

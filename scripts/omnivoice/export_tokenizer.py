@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c)  2026  Xiaomi Corporation
+#                2026  Waad Ben Kheder
 """Export the OmniVoice Qwen3 tokenizer in slow (vocab.json + merges.txt) format.
 
 The sherpa-onnx C++ tokenizer (`QwenAsrTokenizer`) reads:

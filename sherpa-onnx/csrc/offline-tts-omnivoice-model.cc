@@ -1,6 +1,7 @@
 // sherpa-onnx/csrc/offline-tts-omnivoice-model.cc
 //
 // Copyright (c)  2026  Xiaomi Corporation
+//                2026  Waad Ben Kheder
 
 #include "sherpa-onnx/csrc/offline-tts-omnivoice-model.h"
 
