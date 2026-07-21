@@ -91,7 +91,42 @@ tuning:
 | `--omnivoice-guidance-scale` | 2.0 | Classifier-free guidance; 0 disables CFG (halves compute) |
 | `--omnivoice-layer-penalty-factor` | 5.0 | Delays later codebook layers when picking unmask positions |
 
-## 4. What was added / modified
+## 4. Troubleshooting
+
+Enable verbose logging on any run to see the estimated target length, the
+tokenized reference / text lengths, and the LM I/O shapes:
+
+```bash
+./bin/sherpa-onnx-offline-tts --debug=1 ...
+```
+
+The line you want is:
+
+```
+omnivoice: ref_tok=125 style=7 text=32 target=124
+```
+
+`ref_tok` should be roughly `reference-audio-duration × 25`. `target`
+should be roughly `expected-output-duration × 25`. If either is
+wildly off, the rest of the output will be too.
+
+| Symptom | Likely cause | Fix |
+| --- | --- | --- |
+| Garbled audio after the first ~1 s (`"here is the tex ssssss"`) | Generation defaults out of sync with the training-time config | Confirm defaults: `num_steps=32`, `t_shift=0.1`, `guidance_scale=2.0`, `layer_penalty_factor=5.0`. Do **not** lower `num_steps` below ~16 |
+| Output has correct words but 3-4× longer than expected, padded with silence / hisses | `--reference-text` does not match the actual content of `--reference-audio` (duration estimator is scaled by the ref-text:ref-tok ratio) | Transcribe the reference clip accurately, or supply `--extra="duration_sec=3.5"` |
+| `"omnivoice: reference_audio is only 0.320 s"` | Reference clip too short for the codec to build a speaker embedding | Use a 3-10 s clip of clean speech |
+| `"codec encoder produced 0 reference tokens"` | Reference clip is silent or all-zero | Sanity-check the wav |
+| `"target length N tokens exceeds cap"` | Text too long for a single MaskGIT pass | Split input at sentence boundaries and concatenate outputs |
+| `"'.../tokenizer/vocab.json' does not exist"` | The upstream HF repo ships only the fast `tokenizer.json`; you skipped the slow-format conversion | Run `scripts/omnivoice/export_tokenizer.py` (or the full `build_bundle.sh`) |
+| Cloned voice sounds nothing like the reference | Reference is too noisy, or `--extra="denoise=0"` was passed on a noisy clip | Try `denoise=1` (default) or a cleaner clip |
+| Non-English text produces wrong prosody | Language tag defaulting to `"None"` | Pass `--extra="language=zh"` (or `en`, `ja`, …) as expected by the training data |
+| Very slow (RTF > 1) | CPU-only, or `num_steps` set high | Build with the CUDA / CoreML EP and/or lower `num_steps` to 16-24 for a small quality hit |
+
+If you file a bug report, please include the full `--debug=1` log and the
+output of `sha256sum` on each ONNX file in your bundle so mismatched
+exports can be ruled out quickly.
+
+## 5. What was added / modified
 
 ### New files
 
