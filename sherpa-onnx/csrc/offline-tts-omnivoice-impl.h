@@ -89,6 +89,24 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
       return {};
     }
 
+    // Reference-audio duration sanity check. Below ~0.5s the codec cannot
+    // extract a meaningful speaker embedding; above ~30s wastes compute and
+    // usually indicates the wrong file was passed.
+    float ref_sec =
+        static_cast<float>(config.reference_audio.size()) /
+        static_cast<float>(config.reference_sample_rate);
+    if (ref_sec < 0.5f) {
+      SHERPA_ONNX_LOGE(
+          "omnivoice: reference_audio is only %.3f s; need at least 0.5 s",
+          ref_sec);
+      return {};
+    }
+    if (ref_sec > 30.0f) {
+      SHERPA_ONNX_LOGE(
+          "omnivoice: reference_audio is %.1f s; anything above ~30 s "
+          "wastes compute. Trim it.", ref_sec);
+    }
+
     const auto &m = model_->GetMetaData();
     const auto &mc = config_.model.omnivoice;
 
@@ -118,6 +136,10 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
         return {};
       }
       ref_tok_len = static_cast<int32_t>(shape[2]);
+      if (ref_tok_len < 1) {
+        SHERPA_ONNX_LOGE("codec encoder produced 0 reference tokens");
+        return {};
+      }
       const int64_t *src = codes.GetTensorData<int64_t>();
       ref_codes.assign(src, src + m.num_codebook * ref_tok_len);
     }
@@ -165,6 +187,19 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
       }
     }
     if (num_target_tokens < 1) num_target_tokens = 1;
+    // Hard cap: 60 s of audio at 25 tok/s. Above this the LM forward passes
+    // will blow memory and quality drops anyway. Callers who need long-form
+    // TTS should chunk on the sentence level.
+    const int32_t kMaxTargetTokens = 60 * m.frame_rate;
+    if (num_target_tokens > kMaxTargetTokens) {
+      SHERPA_ONNX_LOGE(
+          "omnivoice: target length %d tokens (%.1f s) exceeds cap %d; "
+          "clipping. Split the input text into shorter sentences.",
+          num_target_tokens,
+          num_target_tokens / static_cast<float>(m.frame_rate),
+          kMaxTargetTokens);
+      num_target_tokens = kMaxTargetTokens;
+    }
     if (config_.model.debug) {
       SHERPA_ONNX_LOGE(
           "omnivoice: ref_tok=%d style=%d text=%d target=%d",
