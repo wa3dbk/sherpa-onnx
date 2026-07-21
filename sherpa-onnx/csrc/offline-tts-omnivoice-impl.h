@@ -72,6 +72,13 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
   //   "guidance_scale"    (float) - override model config.
   //   "t_shift"           (float) - override model config.
   //   "layer_penalty"     (float) - override model config.
+  //   "position_temperature" (float) - override model config.
+  //   "seed"              (int) - override model config; <0 = nondeterministic.
+  //   "cache_reference_audio" (int) - 1 (default) to reuse the cached codec
+  //       encoding when the reference audio is unchanged.
+  //   "chunk_ms"          (int) - streaming chunk size in ms for the
+  //       GeneratedAudioCallback (default 500). Also emits progress-only
+  //       ticks (n=0) after each MaskGIT step.
   GeneratedAudio Generate(
       const std::string &text, const GenerationConfig &config,
       GeneratedAudioCallback callback = nullptr) const override {
@@ -420,6 +427,25 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
         int32_t idx = order[i];
         if (tokens[idx] == mask_id) tokens[idx] = pred[idx];
       }
+
+      // MaskGIT progress tick: no audio yet, but let UI callers show a
+      // progress bar and give them a chance to abort. Cap at
+      // kMaskGitProgressFrac so the chunked-decode phase can fill the
+      // remaining fraction as real samples arrive.
+      if (callback) {
+        constexpr float kMaskGitProgressFrac = 0.9f;
+        float p = kMaskGitProgressFrac *
+                  (static_cast<float>(step + 1) / num_steps);
+        if (!callback(nullptr, 0, p)) {
+          if (config_.model.debug) {
+            SHERPA_ONNX_LOGE(
+                "omnivoice: callback returned 0 during MaskGIT step %d; "
+                "aborting",
+                step);
+          }
+          return {};
+        }
+      }
     }
 
     // --- 7. Decode 8-codebook tokens back into a waveform ------------------
@@ -440,7 +466,41 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
     ans.sample_rate = m.sample_rate;
     ans.samples.assign(psrc, psrc + n_samples);
 
-    if (callback) callback(ans.samples.data(), n_samples, 1.0f);
+    // Chunked delivery. The Higgs codec is a single ONNX graph so we cannot
+    // start emitting audio *before* it finishes, but streaming the finished
+    // PCM in ~500 ms chunks still lets the caller start playback ~one chunk
+    // after decode ends instead of buffering the entire clip. Override via
+    // extra "chunk_ms".
+    if (callback && n_samples > 0) {
+      int32_t chunk_ms = config.GetExtraInt("chunk_ms", 500);
+      if (chunk_ms < 20) chunk_ms = 20;  // sub-20ms just wastes callbacks
+      int64_t chunk_samples =
+          static_cast<int64_t>(m.sample_rate) * chunk_ms / 1000;
+      if (chunk_samples < 1) chunk_samples = 1;
+
+      constexpr float kMaskGitProgressFrac = 0.9f;
+      constexpr float kDecodeFrac = 1.0f - kMaskGitProgressFrac;
+
+      for (int64_t off = 0; off < n_samples; off += chunk_samples) {
+        int64_t end = std::min(off + chunk_samples, n_samples);
+        float p = kMaskGitProgressFrac +
+                  kDecodeFrac *
+                      (static_cast<float>(end) / static_cast<float>(n_samples));
+        if (!callback(ans.samples.data() + off,
+                      static_cast<int32_t>(end - off), p)) {
+          // Caller asked to stop mid-stream. Return what we already produced
+          // (up to the end of the last delivered chunk).
+          if (config_.model.debug) {
+            SHERPA_ONNX_LOGE(
+                "omnivoice: callback returned 0 during chunked decode at "
+                "%.1f%%; truncating output",
+                p * 100.0f);
+          }
+          ans.samples.resize(end);
+          return ans;
+        }
+      }
+    }
     return ans;
   }
 
