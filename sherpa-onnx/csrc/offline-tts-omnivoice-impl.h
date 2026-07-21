@@ -11,6 +11,7 @@
 #include <limits>
 #include <numeric>
 #include <memory>
+#include <random>
 #include <string>
 #include <utility>
 #include <vector>
@@ -117,6 +118,13 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
     float t_shift = config.GetExtraFloat("t_shift", mc.t_shift);
     float layer_penalty =
         config.GetExtraFloat("layer_penalty", mc.layer_penalty_factor);
+    float position_temperature = config.GetExtraFloat(
+        "position_temperature", mc.position_temperature);
+    int32_t seed = config.GetExtraInt("seed", mc.seed);
+
+    std::mt19937 rng(seed >= 0 ? static_cast<uint32_t>(seed)
+                               : std::random_device{}());
+    std::uniform_real_distribution<float> uni(1e-10f, 1.0f);
     std::string language = config.GetExtraString("language", "None");
     std::string instruct = config.GetExtraString("instruct", "None");
     bool denoise = config.GetExtraInt("denoise", 1) != 0;
@@ -353,7 +361,25 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
         }
       }
 
-      // Top-k unmask by confidence.
+      // Perturb confidences with annealed Gumbel noise for stochastic
+      // position selection (MaskGIT-style). The noise scale decays linearly
+      // to zero at the final step, so early passes explore and late passes
+      // commit deterministically to the highest-confidence positions.
+      if (position_temperature > 0.0f) {
+        float anneal = 1.0f - static_cast<float>(step) / num_steps;
+        float scale = position_temperature * anneal;
+        if (scale > 0.0f) {
+          for (int32_t idx = 0; idx < C * num_target_tokens; ++idx) {
+            if (tokens[idx] != mask_id) continue;
+            // Gumbel(0,1) = -log(-log(U)), U in (0,1).
+            float u = uni(rng);
+            float g = -std::log(-std::log(u));
+            conf[idx] += scale * g;
+          }
+        }
+      }
+
+      // Top-k unmask by (possibly perturbed) confidence.
       std::vector<int32_t> order(C * num_target_tokens);
       std::iota(order.begin(), order.end(), 0);
       std::partial_sort(

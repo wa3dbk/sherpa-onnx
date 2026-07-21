@@ -40,6 +40,17 @@ struct OfflineTtsOmnivoiceModelConfig {
   // unmask (later codebooks get delayed).
   float layer_penalty_factor = 5.0f;
 
+  // Gumbel-noise temperature for MaskGIT position sampling. Perturbs the
+  // per-position confidence scores before top-k, annealed linearly to 0 by
+  // the last step. 0 => deterministic (previous behavior); >0 matches the
+  // OmniVoice Python reference (default 5.0).
+  float position_temperature = 5.0f;
+
+  // RNG seed for Gumbel sampling. <0 => nondeterministic (seeded from
+  // std::random_device). Set to a fixed non-negative value for reproducible
+  // output.
+  int32_t seed = -1;
+
   OfflineTtsOmnivoiceModelConfig() = default;
 
   OfflineTtsOmnivoiceModelConfig(const std::string &model,
@@ -48,7 +59,9 @@ struct OfflineTtsOmnivoiceModelConfig {
                                  const std::string &tokenizer_dir,
                                  int32_t num_steps = 32, float t_shift = 0.1f,
                                  float guidance_scale = 2.0f,
-                                 float layer_penalty_factor = 5.0f)
+                                 float layer_penalty_factor = 5.0f,
+                                 float position_temperature = 5.0f,
+                                 int32_t seed = -1)
       : model(model),
         codec_encoder(codec_encoder),
         codec_decoder(codec_decoder),
@@ -56,7 +69,9 @@ struct OfflineTtsOmnivoiceModelConfig {
         num_steps(num_steps),
         t_shift(t_shift),
         guidance_scale(guidance_scale),
-        layer_penalty_factor(layer_penalty_factor) {}
+        layer_penalty_factor(layer_penalty_factor),
+        position_temperature(position_temperature),
+        seed(seed) {}
 
   void Register(ParseOptions *po);
   bool Validate() const;

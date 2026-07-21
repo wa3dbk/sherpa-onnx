@@ -90,6 +90,8 @@ tuning:
 | `--omnivoice-t-shift` | 0.1 | Time-schedule shift (smaller = more mass early) |
 | `--omnivoice-guidance-scale` | 2.0 | Classifier-free guidance; 0 disables CFG (halves compute) |
 | `--omnivoice-layer-penalty-factor` | 5.0 | Delays later codebook layers when picking unmask positions |
+| `--omnivoice-position-temperature` | 5.0 | Gumbel-noise temperature for stochastic position sampling; annealed to 0 by the last step. Set 0 for deterministic decoding |
+| `--omnivoice-seed` | -1 | RNG seed for Gumbel sampling. Use a fixed non-negative value for reproducible output |
 
 ## 4. Troubleshooting
 

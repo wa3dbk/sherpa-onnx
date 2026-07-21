@@ -32,6 +32,13 @@ void OfflineTtsOmnivoiceModelConfig::Register(ParseOptions *po) {
                "Classifier-free guidance scale; 0 disables CFG (default: 2.0)");
   po->Register("omnivoice-layer-penalty-factor", &layer_penalty_factor,
                "Confidence penalty for later codebook layers (default: 5.0)");
+  po->Register("omnivoice-position-temperature", &position_temperature,
+               "Gumbel-noise temperature for MaskGIT position sampling; "
+               "annealed linearly to 0 by the last step. 0 = deterministic "
+               "(default: 5.0)");
+  po->Register("omnivoice-seed", &seed,
+               "RNG seed for Gumbel sampling. <0 = nondeterministic "
+               "(default: -1)");
 }
 
 bool OfflineTtsOmnivoiceModelConfig::Validate() const {
@@ -89,6 +96,12 @@ bool OfflineTtsOmnivoiceModelConfig::Validate() const {
                      guidance_scale);
     return false;
   }
+  if (position_temperature < 0) {
+    SHERPA_ONNX_LOGE(
+        "--omnivoice-position-temperature must be >= 0. Given: %f",
+        position_temperature);
+    return false;
+  }
 
   return true;
 }
@@ -103,7 +116,9 @@ std::string OfflineTtsOmnivoiceModelConfig::ToString() const {
   os << "num_steps=" << num_steps << ", ";
   os << "t_shift=" << t_shift << ", ";
   os << "guidance_scale=" << guidance_scale << ", ";
-  os << "layer_penalty_factor=" << layer_penalty_factor << ")";
+  os << "layer_penalty_factor=" << layer_penalty_factor << ", ";
+  os << "position_temperature=" << position_temperature << ", ";
+  os << "seed=" << seed << ")";
   return os.str();
 }
 
