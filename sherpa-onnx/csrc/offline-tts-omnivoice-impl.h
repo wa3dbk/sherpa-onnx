@@ -11,6 +11,7 @@
 #include <limits>
 #include <numeric>
 #include <memory>
+#include <mutex>
 #include <random>
 #include <string>
 #include <utility>
@@ -130,9 +131,29 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
     bool denoise = config.GetExtraInt("denoise", 1) != 0;
 
     // --- 1. Encode reference audio into codec tokens ------------------------
+    // The encoder output depends only on the reference clip, so cache the
+    // result by content hash and skip the codec forward on repeat calls with
+    // the same voice. Disable per-request with extra "cache_reference_audio=0".
     std::vector<int64_t> ref_codes;  // flattened [C, T_ref] row-major
     int32_t ref_tok_len = 0;
+    bool cache_enabled =
+        config.GetExtraInt("cache_reference_audio", 1) != 0;
+    uint64_t ref_hash = HashPcm(config.reference_audio.data(),
+                                static_cast<int32_t>(
+                                    config.reference_audio.size()),
+                                config.reference_sample_rate);
     {
+      std::lock_guard<std::mutex> lock(ref_cache_mutex_);
+      if (cache_enabled && ref_cache_valid_ && ref_cache_key_ == ref_hash) {
+        ref_codes = ref_cache_codes_;
+        ref_tok_len = ref_cache_tok_len_;
+        if (config_.model.debug) {
+          SHERPA_ONNX_LOGE("omnivoice: reference audio cache hit (%d tokens)",
+                           ref_tok_len);
+        }
+      }
+    }
+    if (ref_tok_len == 0) {
       std::vector<float> pcm =
           Resample(config.reference_audio.data(),
                    static_cast<int32_t>(config.reference_audio.size()),
@@ -151,6 +172,14 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
       }
       const int64_t *src = codes.GetTensorData<int64_t>();
       ref_codes.assign(src, src + m.num_codebook * ref_tok_len);
+
+      if (cache_enabled) {
+        std::lock_guard<std::mutex> lock(ref_cache_mutex_);
+        ref_cache_key_ = ref_hash;
+        ref_cache_codes_ = ref_codes;
+        ref_cache_tok_len_ = ref_tok_len;
+        ref_cache_valid_ = true;
+      }
     }
 
     // --- 2. Tokenize style + text prompts ----------------------------------
@@ -416,6 +445,24 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
   }
 
  private:
+  // FNV-1a 64-bit over sample rate + count + raw PCM bytes. Fast enough
+  // (~1 GB/s) that hashing 30 s of 24 kHz float is <3 ms, negligible next
+  // to the codec forward it protects.
+  static uint64_t HashPcm(const float *data, int32_t n, int32_t sr) {
+    uint64_t h = 0xcbf29ce484222325ULL;
+    auto mix = [&](const void *p, size_t bytes) {
+      const uint8_t *b = static_cast<const uint8_t *>(p);
+      for (size_t i = 0; i < bytes; ++i) {
+        h ^= b[i];
+        h *= 0x100000001b3ULL;
+      }
+    };
+    mix(&sr, sizeof(sr));
+    mix(&n, sizeof(n));
+    if (n > 0) mix(data, sizeof(float) * static_cast<size_t>(n));
+    return h;
+  }
+
   static std::string Strip(const std::string &s) {
     size_t a = s.find_first_not_of(" \t\r\n");
     if (a == std::string::npos) return "";
@@ -514,6 +561,16 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
   OfflineTtsConfig config_;
   std::unique_ptr<OfflineTtsOmnivoiceModel> model_;
   std::unique_ptr<QwenAsrTokenizer> tokenizer_;
+
+  // Single-entry reference-audio cache. Voice-cloning workloads typically
+  // reuse the same reference clip for many synthesis calls, so a one-slot
+  // last-value cache eliminates the codec-encoder pass on all repeats while
+  // costing effectively no memory (~a few KB per entry).
+  mutable std::mutex ref_cache_mutex_;
+  mutable uint64_t ref_cache_key_ = 0;
+  mutable bool ref_cache_valid_ = false;
+  mutable std::vector<int64_t> ref_cache_codes_;
+  mutable int32_t ref_cache_tok_len_ = 0;
 };
 
 }  // namespace sherpa_onnx
