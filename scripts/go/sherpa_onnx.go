@@ -1057,6 +1057,22 @@ type OfflineTtsSupertonicModelConfig struct {
 	VoiceStyle        string // Path to voice.bin
 }
 
+type OfflineTtsOmnivoiceModelConfig struct {
+	Model         string // Path to omnivoice.onnx (has .onnx_data alongside)
+	CodecEncoder  string // Path to Higgs-Audio-V2 codec encoder ONNX
+	CodecDecoder  string // Path to Higgs-Audio-V2 codec decoder ONNX
+	TokenizerDir  string // Directory with vocab.json / merges.txt / tokenizer_config.json
+	PrefixModel   string // Optional: omnivoice_prefix.onnx (KV-cache fast path)
+	TargetModel   string // Optional: omnivoice_target.onnx (pair with PrefixModel)
+
+	NumSteps            int     // MaskGIT denoising steps (default 32)
+	TShift              float32 // Time-schedule shift (default 0.1)
+	GuidanceScale       float32 // CFG scale; 0 disables CFG (default 2.0)
+	LayerPenaltyFactor  float32 // Confidence penalty for later codebooks (default 5.0)
+	PositionTemperature float32 // Gumbel-noise temperature for MaskGIT sampling (default 5.0)
+	Seed                int     // <0 => nondeterministic (default -1)
+}
+
 type OfflineTtsModelConfig struct {
 	Vits       OfflineTtsVitsModelConfig
 	Matcha     OfflineTtsMatchaModelConfig
@@ -1065,6 +1081,7 @@ type OfflineTtsModelConfig struct {
 	Zipvoice   OfflineTtsZipvoiceModelConfig
 	Pocket     OfflineTtsPocketModelConfig
 	Supertonic OfflineTtsSupertonicModelConfig
+	Omnivoice  OfflineTtsOmnivoiceModelConfig
 
 	// Number of threads to use for neural network computation
 	NumThreads int
@@ -1349,6 +1366,32 @@ func NewOfflineTts(config *OfflineTtsConfig) *OfflineTts {
 
 	c.model.supertonic.voice_style = C.CString(config.Model.Supertonic.VoiceStyle)
 	defer C.free(unsafe.Pointer(c.model.supertonic.voice_style))
+
+	// omnivoice
+	c.model.omnivoice.model = C.CString(config.Model.Omnivoice.Model)
+	defer C.free(unsafe.Pointer(c.model.omnivoice.model))
+
+	c.model.omnivoice.codec_encoder = C.CString(config.Model.Omnivoice.CodecEncoder)
+	defer C.free(unsafe.Pointer(c.model.omnivoice.codec_encoder))
+
+	c.model.omnivoice.codec_decoder = C.CString(config.Model.Omnivoice.CodecDecoder)
+	defer C.free(unsafe.Pointer(c.model.omnivoice.codec_decoder))
+
+	c.model.omnivoice.tokenizer_dir = C.CString(config.Model.Omnivoice.TokenizerDir)
+	defer C.free(unsafe.Pointer(c.model.omnivoice.tokenizer_dir))
+
+	c.model.omnivoice.prefix_model = C.CString(config.Model.Omnivoice.PrefixModel)
+	defer C.free(unsafe.Pointer(c.model.omnivoice.prefix_model))
+
+	c.model.omnivoice.target_model = C.CString(config.Model.Omnivoice.TargetModel)
+	defer C.free(unsafe.Pointer(c.model.omnivoice.target_model))
+
+	c.model.omnivoice.num_steps = C.int(config.Model.Omnivoice.NumSteps)
+	c.model.omnivoice.t_shift = C.float(config.Model.Omnivoice.TShift)
+	c.model.omnivoice.guidance_scale = C.float(config.Model.Omnivoice.GuidanceScale)
+	c.model.omnivoice.layer_penalty_factor = C.float(config.Model.Omnivoice.LayerPenaltyFactor)
+	c.model.omnivoice.position_temperature = C.float(config.Model.Omnivoice.PositionTemperature)
+	c.model.omnivoice.seed = C.int(config.Model.Omnivoice.Seed)
 
 	c.model.num_threads = C.int(config.Model.NumThreads)
 	c.model.debug = C.int(config.Model.Debug)

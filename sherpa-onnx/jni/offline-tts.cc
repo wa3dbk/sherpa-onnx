@@ -317,6 +317,38 @@ static OfflineTtsConfig GetOfflineTtsConfig(JNIEnv *env, jobject config,
   SHERPA_ONNX_JNI_READ_STRING(ans.model.supertonic.voice_style, voiceStyle,
                               supertonic_cls, supertonic);
 
+  // omnivoice
+  fid = env->GetFieldID(
+      model_config_cls, "omnivoice",
+      "Lcom/k2fsa/sherpa/onnx/OfflineTtsOmnivoiceModelConfig;");
+  jobject omnivoice = env->GetObjectField(model, fid);
+  jclass omnivoice_cls = env->GetObjectClass(omnivoice);
+
+  SHERPA_ONNX_JNI_READ_STRING(ans.model.omnivoice.model, model, omnivoice_cls,
+                              omnivoice);
+  SHERPA_ONNX_JNI_READ_STRING(ans.model.omnivoice.codec_encoder, codecEncoder,
+                              omnivoice_cls, omnivoice);
+  SHERPA_ONNX_JNI_READ_STRING(ans.model.omnivoice.codec_decoder, codecDecoder,
+                              omnivoice_cls, omnivoice);
+  SHERPA_ONNX_JNI_READ_STRING(ans.model.omnivoice.tokenizer_dir, tokenizerDir,
+                              omnivoice_cls, omnivoice);
+  SHERPA_ONNX_JNI_READ_STRING(ans.model.omnivoice.prefix_model, prefixModel,
+                              omnivoice_cls, omnivoice);
+  SHERPA_ONNX_JNI_READ_STRING(ans.model.omnivoice.target_model, targetModel,
+                              omnivoice_cls, omnivoice);
+  SHERPA_ONNX_JNI_READ_INT(ans.model.omnivoice.num_steps, numSteps,
+                           omnivoice_cls, omnivoice);
+  SHERPA_ONNX_JNI_READ_FLOAT(ans.model.omnivoice.t_shift, tShift, omnivoice_cls,
+                             omnivoice);
+  SHERPA_ONNX_JNI_READ_FLOAT(ans.model.omnivoice.guidance_scale, guidanceScale,
+                             omnivoice_cls, omnivoice);
+  SHERPA_ONNX_JNI_READ_FLOAT(ans.model.omnivoice.layer_penalty_factor,
+                             layerPenaltyFactor, omnivoice_cls, omnivoice);
+  SHERPA_ONNX_JNI_READ_FLOAT(ans.model.omnivoice.position_temperature,
+                             positionTemperature, omnivoice_cls, omnivoice);
+  SHERPA_ONNX_JNI_READ_INT(ans.model.omnivoice.seed, seed, omnivoice_cls,
+                           omnivoice);
+
   SHERPA_ONNX_JNI_READ_INT(ans.model.num_threads, numThreads, model_config_cls,
                            model);
 
@@ -348,6 +380,8 @@ static OfflineTtsConfig GetOfflineTtsConfig(JNIEnv *env, jobject config,
   env->DeleteLocalRef(pocket_cls);
   env->DeleteLocalRef(supertonic);
   env->DeleteLocalRef(supertonic_cls);
+  env->DeleteLocalRef(omnivoice);
+  env->DeleteLocalRef(omnivoice_cls);
   env->DeleteLocalRef(model_config_cls);
   env->DeleteLocalRef(cls);
 

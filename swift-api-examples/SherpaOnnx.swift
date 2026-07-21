@@ -1162,6 +1162,36 @@ func sherpaOnnxOfflineTtsSupertonicModelConfig(
   )
 }
 
+func sherpaOnnxOfflineTtsOmnivoiceModelConfig(
+  model: String = "",
+  codecEncoder: String = "",
+  codecDecoder: String = "",
+  tokenizerDir: String = "",
+  prefixModel: String = "",
+  targetModel: String = "",
+  numSteps: Int = 32,
+  tShift: Float = 0.1,
+  guidanceScale: Float = 2.0,
+  layerPenaltyFactor: Float = 5.0,
+  positionTemperature: Float = 5.0,
+  seed: Int = -1
+) -> SherpaOnnxOfflineTtsOmnivoiceModelConfig {
+  return SherpaOnnxOfflineTtsOmnivoiceModelConfig(
+    model: toCPointer(model),
+    codec_encoder: toCPointer(codecEncoder),
+    codec_decoder: toCPointer(codecDecoder),
+    tokenizer_dir: toCPointer(tokenizerDir),
+    prefix_model: toCPointer(prefixModel),
+    target_model: toCPointer(targetModel),
+    num_steps: Int32(numSteps),
+    t_shift: tShift,
+    guidance_scale: guidanceScale,
+    layer_penalty_factor: layerPenaltyFactor,
+    position_temperature: positionTemperature,
+    seed: Int32(seed)
+  )
+}
+
 func sherpaOnnxOfflineTtsModelConfig(
   vits: SherpaOnnxOfflineTtsVitsModelConfig = sherpaOnnxOfflineTtsVitsModelConfig(),
   matcha: SherpaOnnxOfflineTtsMatchaModelConfig = sherpaOnnxOfflineTtsMatchaModelConfig(),
@@ -1173,7 +1203,9 @@ func sherpaOnnxOfflineTtsModelConfig(
   zipvoice: SherpaOnnxOfflineTtsZipvoiceModelConfig = sherpaOnnxOfflineTtsZipvoiceModelConfig(),
   pocket: SherpaOnnxOfflineTtsPocketModelConfig = sherpaOnnxOfflineTtsPocketModelConfig(),
   supertonic: SherpaOnnxOfflineTtsSupertonicModelConfig =
-    sherpaOnnxOfflineTtsSupertonicModelConfig()
+    sherpaOnnxOfflineTtsSupertonicModelConfig(),
+  omnivoice: SherpaOnnxOfflineTtsOmnivoiceModelConfig =
+    sherpaOnnxOfflineTtsOmnivoiceModelConfig()
 ) -> SherpaOnnxOfflineTtsModelConfig {
   return SherpaOnnxOfflineTtsModelConfig(
     vits: vits,
@@ -1185,7 +1217,8 @@ func sherpaOnnxOfflineTtsModelConfig(
     kitten: kitten,
     zipvoice: zipvoice,
     pocket: pocket,
-    supertonic: supertonic
+    supertonic: supertonic,
+    omnivoice: omnivoice
   )
 }
 

@@ -91,6 +91,21 @@ data class OfflineTtsSupertonicModelConfig(
   var voiceStyle: String = "",
 )
 
+data class OfflineTtsOmnivoiceModelConfig(
+    var model: String = "",
+    var codecEncoder: String = "",
+    var codecDecoder: String = "",
+    var tokenizerDir: String = "",
+    var prefixModel: String = "",
+    var targetModel: String = "",
+    var numSteps: Int = 32,
+    var tShift: Float = 0.1f,
+    var guidanceScale: Float = 2.0f,
+    var layerPenaltyFactor: Float = 5.0f,
+    var positionTemperature: Float = 5.0f,
+    var seed: Int = -1,
+)
+
 data class OfflineTtsModelConfig(
     var vits: OfflineTtsVitsModelConfig = OfflineTtsVitsModelConfig(),
     var matcha: OfflineTtsMatchaModelConfig = OfflineTtsMatchaModelConfig(),
@@ -99,6 +114,7 @@ data class OfflineTtsModelConfig(
     var kitten: OfflineTtsKittenModelConfig = OfflineTtsKittenModelConfig(),
     var pocket: OfflineTtsPocketModelConfig = OfflineTtsPocketModelConfig(),
     var supertonic: OfflineTtsSupertonicModelConfig = OfflineTtsSupertonicModelConfig(),
+    var omnivoice: OfflineTtsOmnivoiceModelConfig = OfflineTtsOmnivoiceModelConfig(),
 
     var numThreads: Int = 1,
     var debug: Boolean = false,
