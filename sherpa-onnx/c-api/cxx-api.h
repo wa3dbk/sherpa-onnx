@@ -983,6 +983,35 @@ struct OfflineTtsSupertonicModelConfig {
   std::string voice_style;
 };
 
+/** @brief OmniVoice TTS model configuration. */
+struct OfflineTtsOmnivoiceModelConfig {
+  /** Path to `omnivoice.onnx` (with `.onnx_data` alongside). */
+  std::string model;
+  /** Path to the Higgs-Audio-V2 codec encoder ONNX. */
+  std::string codec_encoder;
+  /** Path to the Higgs-Audio-V2 codec decoder ONNX. */
+  std::string codec_decoder;
+  /** Directory with `vocab.json`/`merges.txt`/`tokenizer_config.json`. */
+  std::string tokenizer_dir;
+  /** Optional path to `omnivoice_prefix.onnx` (KV-cache fast path). */
+  std::string prefix_model;
+  /** Optional path to `omnivoice_target.onnx`; pair with `prefix_model`. */
+  std::string target_model;
+
+  /** MaskGIT denoising steps. */
+  int32_t num_steps = 32;
+  /** Time-schedule shift. */
+  float t_shift = 0.1f;
+  /** Classifier-free guidance scale; 0 disables CFG. */
+  float guidance_scale = 2.0f;
+  /** Confidence penalty for later codebook layers. */
+  float layer_penalty_factor = 5.0f;
+  /** Gumbel-noise temperature for MaskGIT position sampling. */
+  float position_temperature = 5.0f;
+  /** RNG seed. <0 => nondeterministic. */
+  int32_t seed = -1;
+};
+
 /**
  * @brief Model configuration for offline TTS.
  *
@@ -1004,6 +1033,8 @@ struct OfflineTtsModelConfig {
   OfflineTtsPocketModelConfig pocket;
   /** Supertonic configuration. */
   OfflineTtsSupertonicModelConfig supertonic;
+  /** OmniVoice configuration. */
+  OfflineTtsOmnivoiceModelConfig omnivoice;
 
   /** Number of inference threads. */
   int32_t num_threads = 1;

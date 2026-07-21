@@ -2379,12 +2379,40 @@ typedef struct SherpaOnnxOfflineTtsSupertonicModelConfig {
   const char *voice_style;
 } SherpaOnnxOfflineTtsSupertonicModelConfig;
 
+/** @brief Configuration for an OmniVoice TTS model. */
+typedef struct SherpaOnnxOfflineTtsOmnivoiceModelConfig {
+  /** Path to `omnivoice.onnx` (has an accompanying `.onnx_data`). */
+  const char *model;
+  /** Path to the Higgs-Audio-V2 codec encoder ONNX. */
+  const char *codec_encoder;
+  /** Path to the Higgs-Audio-V2 codec decoder ONNX. */
+  const char *codec_decoder;
+  /** Directory containing `vocab.json` / `merges.txt` / `tokenizer_config.json`. */
+  const char *tokenizer_dir;
+  /** Optional path to `omnivoice_prefix.onnx` (KV-cache fast path). */
+  const char *prefix_model;
+  /** Optional path to `omnivoice_target.onnx`; pair with `prefix_model`. */
+  const char *target_model;
+  /** MaskGIT denoising steps. Default 32. */
+  int32_t num_steps;
+  /** Time-schedule shift. Default 0.1. */
+  float t_shift;
+  /** Classifier-free guidance scale; 0 disables CFG. Default 2.0. */
+  float guidance_scale;
+  /** Confidence penalty for later codebook layers. Default 5.0. */
+  float layer_penalty_factor;
+  /** Gumbel-noise temperature for MaskGIT position sampling. Default 5.0. */
+  float position_temperature;
+  /** RNG seed. <0 => nondeterministic. Default -1. */
+  int32_t seed;
+} SherpaOnnxOfflineTtsOmnivoiceModelConfig;
+
 /**
  * @brief Configuration shared by offline TTS models.
  *
  * Exactly one TTS model family should be configured. For example, set only one
- * of @c vits, @c matcha, @c kokoro, @c kitten, @c zipvoice, @c pocket, or
- * @c supertonic.
+ * of @c vits, @c matcha, @c kokoro, @c kitten, @c zipvoice, @c pocket,
+ * @c supertonic, or @c omnivoice.
  *
  * If multiple model families are configured at the same time, the
  * implementation will choose one of them, and which one is used is
@@ -2417,6 +2445,8 @@ typedef struct SherpaOnnxOfflineTtsModelConfig {
   SherpaOnnxOfflineTtsPocketModelConfig pocket;
   /** Supertonic configuration. */
   SherpaOnnxOfflineTtsSupertonicModelConfig supertonic;
+  /** OmniVoice configuration. */
+  SherpaOnnxOfflineTtsOmnivoiceModelConfig omnivoice;
 } SherpaOnnxOfflineTtsModelConfig;
 
 /**

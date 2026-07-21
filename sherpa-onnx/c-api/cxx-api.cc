@@ -556,6 +556,24 @@ OfflineTts OfflineTts::Create(const OfflineTtsConfig &config) {
       config.model.supertonic.unicode_indexer.c_str();
   c.model.supertonic.voice_style = config.model.supertonic.voice_style.c_str();
 
+  c.model.omnivoice.model = config.model.omnivoice.model.c_str();
+  c.model.omnivoice.codec_encoder =
+      config.model.omnivoice.codec_encoder.c_str();
+  c.model.omnivoice.codec_decoder =
+      config.model.omnivoice.codec_decoder.c_str();
+  c.model.omnivoice.tokenizer_dir =
+      config.model.omnivoice.tokenizer_dir.c_str();
+  c.model.omnivoice.prefix_model = config.model.omnivoice.prefix_model.c_str();
+  c.model.omnivoice.target_model = config.model.omnivoice.target_model.c_str();
+  c.model.omnivoice.num_steps = config.model.omnivoice.num_steps;
+  c.model.omnivoice.t_shift = config.model.omnivoice.t_shift;
+  c.model.omnivoice.guidance_scale = config.model.omnivoice.guidance_scale;
+  c.model.omnivoice.layer_penalty_factor =
+      config.model.omnivoice.layer_penalty_factor;
+  c.model.omnivoice.position_temperature =
+      config.model.omnivoice.position_temperature;
+  c.model.omnivoice.seed = config.model.omnivoice.seed;
+
   c.model.num_threads = config.model.num_threads;
   c.model.debug = config.model.debug;
   c.model.provider = config.model.provider.c_str();

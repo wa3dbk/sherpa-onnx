@@ -1575,6 +1575,32 @@ static sherpa_onnx::OfflineTtsConfig GetOfflineTtsConfig(
   tts_config.model.supertonic.voice_style =
       SHERPA_ONNX_OR(config->model.supertonic.voice_style, "");
 
+  // omnivoice
+  tts_config.model.omnivoice.model =
+      SHERPA_ONNX_OR(config->model.omnivoice.model, "");
+  tts_config.model.omnivoice.codec_encoder =
+      SHERPA_ONNX_OR(config->model.omnivoice.codec_encoder, "");
+  tts_config.model.omnivoice.codec_decoder =
+      SHERPA_ONNX_OR(config->model.omnivoice.codec_decoder, "");
+  tts_config.model.omnivoice.tokenizer_dir =
+      SHERPA_ONNX_OR(config->model.omnivoice.tokenizer_dir, "");
+  tts_config.model.omnivoice.prefix_model =
+      SHERPA_ONNX_OR(config->model.omnivoice.prefix_model, "");
+  tts_config.model.omnivoice.target_model =
+      SHERPA_ONNX_OR(config->model.omnivoice.target_model, "");
+  tts_config.model.omnivoice.num_steps =
+      SHERPA_ONNX_OR(config->model.omnivoice.num_steps, 32);
+  tts_config.model.omnivoice.t_shift =
+      SHERPA_ONNX_OR(config->model.omnivoice.t_shift, 0.1f);
+  tts_config.model.omnivoice.guidance_scale =
+      SHERPA_ONNX_OR(config->model.omnivoice.guidance_scale, 2.0f);
+  tts_config.model.omnivoice.layer_penalty_factor =
+      SHERPA_ONNX_OR(config->model.omnivoice.layer_penalty_factor, 5.0f);
+  tts_config.model.omnivoice.position_temperature =
+      SHERPA_ONNX_OR(config->model.omnivoice.position_temperature, 5.0f);
+  tts_config.model.omnivoice.seed =
+      SHERPA_ONNX_OR(config->model.omnivoice.seed, -1);
+
   tts_config.model.num_threads = SHERPA_ONNX_OR(config->model.num_threads, 1);
   tts_config.model.debug = config->model.debug;
   tts_config.model.provider = SHERPA_ONNX_OR(config->model.provider, "cpu");

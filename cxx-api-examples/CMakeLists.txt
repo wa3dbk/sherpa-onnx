@@ -253,6 +253,9 @@ if(SHERPA_ONNX_ENABLE_TTS)
   add_executable(zipvoice-tts-zh-en-cxx-api ./zipvoice-tts-zh-en-cxx-api.cc)
   target_link_libraries(zipvoice-tts-zh-en-cxx-api sherpa-onnx-cxx-api)
 
+  add_executable(omnivoice-tts-cxx-api ./omnivoice-tts-cxx-api.cc)
+  target_link_libraries(omnivoice-tts-cxx-api sherpa-onnx-cxx-api)
+
   add_executable(offline-tts-piper-cxx-api ./offline-tts-piper-cxx-api.cc)
   target_link_libraries(offline-tts-piper-cxx-api sherpa-onnx-cxx-api)
 endif()
