@@ -39,6 +39,26 @@ class OfflineTtsOmnivoiceModel {
   Ort::Value RunLM(Ort::Value input_ids, Ort::Value audio_mask,
                    Ort::Value attention_mask, Ort::Value position_ids) const;
 
+  // True when the cached prefix/target pair was loaded successfully.
+  bool HasCachedLM() const;
+
+  // Prefix graph. Batch 1 only.
+  //   inputs  (as RunLM)
+  //   returns per-layer K/V as a flat vector, order: [K0, V0, K1, V1, ...].
+  // Each tensor has shape [1, num_kv_heads, S_pref, head_dim].
+  std::vector<Ort::Value> RunLMPrefix(Ort::Value input_ids,
+                                      Ort::Value audio_mask,
+                                      Ort::Value attention_mask,
+                                      Ort::Value position_ids) const;
+
+  // Target graph. Batch 1 only. `past` order matches RunLMPrefix output.
+  //   attention_mask covers [past + current] length.
+  //   position_ids  are absolute (start at S_pref).
+  //   returns logits float [1, num_codebook, S_tgt, audio_vocab_size].
+  Ort::Value RunLMTarget(Ort::Value input_ids, Ort::Value audio_mask,
+                         Ort::Value attention_mask, Ort::Value position_ids,
+                         std::vector<Ort::Value> past) const;
+
   // input:  float [1, 1, num_samples] at 24 kHz mono
   // output: int64 [1, num_codebook, num_tokens]
   Ort::Value EncodeAudio(Ort::Value pcm) const;

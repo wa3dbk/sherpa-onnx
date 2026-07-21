@@ -24,6 +24,14 @@ void OfflineTtsOmnivoiceModelConfig::Register(ParseOptions *po) {
   po->Register("omnivoice-tokenizer-dir", &tokenizer_dir,
                "Directory with vocab.json/merges.txt/tokenizer_config.json "
                "for the Qwen3 tokenizer used by OmniVoice");
+  po->Register("omnivoice-prefix-model", &prefix_model,
+               "Optional: KV-cache prefix graph "
+               "(omnivoice_prefix.onnx). Enables ~1.5-2x speedup when set "
+               "together with --omnivoice-target-model.");
+  po->Register("omnivoice-target-model", &target_model,
+               "Optional: KV-cache target graph "
+               "(omnivoice_target.onnx). Enables ~1.5-2x speedup when set "
+               "together with --omnivoice-prefix-model.");
   po->Register("omnivoice-num-steps", &num_steps,
                "MaskGIT-style denoising steps (default: 32)");
   po->Register("omnivoice-t-shift", &t_shift,
@@ -82,6 +90,24 @@ bool OfflineTtsOmnivoiceModelConfig::Validate() const {
     }
   }
 
+  // Cached-LM pair is optional but must be provided as a pair.
+  if (prefix_model.empty() != target_model.empty()) {
+    SHERPA_ONNX_LOGE(
+        "--omnivoice-prefix-model and --omnivoice-target-model must be "
+        "provided together (or neither).");
+    return false;
+  }
+  if (!prefix_model.empty() && !FileExists(prefix_model)) {
+    SHERPA_ONNX_LOGE("--omnivoice-prefix-model: '%s' does not exist",
+                     prefix_model.c_str());
+    return false;
+  }
+  if (!target_model.empty() && !FileExists(target_model)) {
+    SHERPA_ONNX_LOGE("--omnivoice-target-model: '%s' does not exist",
+                     target_model.c_str());
+    return false;
+  }
+
   if (num_steps < 1) {
     SHERPA_ONNX_LOGE("--omnivoice-num-steps must be >= 1. Given: %d",
                      num_steps);
@@ -113,6 +139,8 @@ std::string OfflineTtsOmnivoiceModelConfig::ToString() const {
   os << "codec_encoder=\"" << codec_encoder << "\", ";
   os << "codec_decoder=\"" << codec_decoder << "\", ";
   os << "tokenizer_dir=\"" << tokenizer_dir << "\", ";
+  os << "prefix_model=\"" << prefix_model << "\", ";
+  os << "target_model=\"" << target_model << "\", ";
   os << "num_steps=" << num_steps << ", ";
   os << "t_shift=" << t_shift << ", ";
   os << "guidance_scale=" << guidance_scale << ", ";

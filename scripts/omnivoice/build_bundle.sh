@@ -16,6 +16,10 @@ HIGGS_REPO=${HIGGS_REPO:-eustlb/higgs-audio-v2-tokenizer}
 DATE=${DATE:-$(date +%Y-%m-%d)}
 OUT=${OUT:-sherpa-onnx-omnivoice-${DATE}}
 DEVICE=${DEVICE:-cpu}
+# Set WITH_CACHED=1 to also export the KV-cache-aware prefix/target ONNX pair
+# used by the ~1.5-2x-faster --omnivoice-prefix-model/--omnivoice-target-model
+# path. Off by default because the extra graphs roughly double bundle size.
+WITH_CACHED=${WITH_CACHED:-0}
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -27,6 +31,13 @@ python3 "${SCRIPT_DIR}/export_omnivoice_onnx.py" \
     --hf-repo "${HF_REPO}" \
     --output "${OUT}/omnivoice.onnx" \
     --device "${DEVICE}"
+
+if [ "${WITH_CACHED}" != "0" ]; then
+  echo "==> Exporting cached OmniVoice LM (prefix + target)"
+  python3 "${SCRIPT_DIR}/export_omnivoice_cached_onnx.py" \
+      --model-path "${HF_REPO}" \
+      --output-dir "${OUT}"
+fi
 
 echo "==> Exporting Higgs-Audio-V2 codec (encoder + decoder) to ONNX"
 python3 "${SCRIPT_DIR}/export_higgs_codec_onnx.py" \
@@ -52,6 +63,10 @@ non-autoregressive decoding. Output: 24 kHz mono.
 - \`higgs_codec_decoder.onnx\` — audio tokens -> 24 kHz waveform
 - \`tokenizer/\` — Qwen3 BPE + OmniVoice special tokens
 - \`test_wavs/\` — sample reference clip + transcript
+- (optional, when built with \`WITH_CACHED=1\`) \`omnivoice_prefix.onnx\` +
+  \`omnivoice_target.onnx\` — KV-cache-aware LM pair for ~1.5-2x faster
+  inference; wire in via \`--omnivoice-prefix-model\` and
+  \`--omnivoice-target-model\`
 
 ## Usage
 

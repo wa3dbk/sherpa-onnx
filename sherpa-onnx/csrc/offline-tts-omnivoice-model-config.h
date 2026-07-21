@@ -25,6 +25,14 @@ struct OfflineTtsOmnivoiceModelConfig {
   // for the Qwen3 tokenizer used by OmniVoice.
   std::string tokenizer_dir;
 
+  // Optional KV-cache-aware LM pair. When both are provided, the MaskGIT
+  // loop reuses the prefix K/V across steps for the CFG-conditional branch,
+  // giving a ~1.5-2x speedup. `model` above is still required and continues
+  // to serve the CFG-unconditional branch (which has no prefix by
+  // construction). See scripts/omnivoice/export_omnivoice_cached_onnx.py.
+  std::string prefix_model;  // omnivoice_prefix.onnx (+ .onnx_data)
+  std::string target_model;  // omnivoice_target.onnx (+ .onnx_data)
+
   // ---- generation defaults (overridable per-request via config.extra) ----
 
   // Number of MaskGIT-style denoising steps.

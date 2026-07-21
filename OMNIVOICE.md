@@ -92,6 +92,11 @@ tuning:
 | `--omnivoice-layer-penalty-factor` | 5.0 | Delays later codebook layers when picking unmask positions |
 | `--omnivoice-position-temperature` | 5.0 | Gumbel-noise temperature for stochastic position sampling; annealed to 0 by the last step. Set 0 for deterministic decoding |
 | `--omnivoice-seed` | -1 | RNG seed for Gumbel sampling. Use a fixed non-negative value for reproducible output |
+| `--omnivoice-prefix-model` | *(empty)* | Optional path to `omnivoice_prefix.onnx`. When set together with `--omnivoice-target-model`, the cond branch of the MaskGIT loop reuses cached prefix K/V across steps for ~1.5-2x speedup. The uncond branch still uses `--omnivoice-model`, which remains required |
+| `--omnivoice-target-model` | *(empty)* | Optional path to `omnivoice_target.onnx`; must be provided together with `--omnivoice-prefix-model` |
+
+Build the cached ONNX pair with `WITH_CACHED=1 ./scripts/omnivoice/build_bundle.sh`
+(or run `scripts/omnivoice/export_omnivoice_cached_onnx.py` directly).
 
 ## 4. Troubleshooting
 

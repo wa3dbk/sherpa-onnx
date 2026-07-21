@@ -49,6 +49,18 @@ class OfflineTtsOmnivoiceModel::Impl {
         env_, SHERPA_ONNX_TO_ORT_PATH(config.omnivoice.codec_decoder),
         sess_opts_);
     InitDec(nullptr, 0);
+
+    if (!config.omnivoice.prefix_model.empty() &&
+        !config.omnivoice.target_model.empty()) {
+      pref_sess_ = std::make_unique<Ort::Session>(
+          env_, SHERPA_ONNX_TO_ORT_PATH(config.omnivoice.prefix_model),
+          sess_opts_);
+      InitPref(nullptr, 0);
+      tgt_sess_ = std::make_unique<Ort::Session>(
+          env_, SHERPA_ONNX_TO_ORT_PATH(config.omnivoice.target_model),
+          sess_opts_);
+      InitTgt(nullptr, 0);
+    }
   }
 
   template <typename Manager>
@@ -65,6 +77,18 @@ class OfflineTtsOmnivoiceModel::Impl {
 
     buf = ReadFile(mgr, config.omnivoice.codec_decoder);
     InitDec(buf.data(), buf.size());
+
+    if (!config.omnivoice.prefix_model.empty() &&
+        !config.omnivoice.target_model.empty()) {
+      buf = ReadFile(mgr, config.omnivoice.prefix_model);
+      InitPref(buf.data(), buf.size());
+      buf = ReadFile(mgr, config.omnivoice.target_model);
+      InitTgt(buf.data(), buf.size());
+    }
+  }
+
+  bool HasCachedLM() const {
+    return pref_sess_ && tgt_sess_;
   }
 
   const OfflineTtsOmnivoiceModelMetaData &GetMetaData() const {
@@ -83,6 +107,39 @@ class OfflineTtsOmnivoiceModel::Impl {
     auto out = lm_sess_->Run({}, lm_input_names_ptr_.data(), inputs.data(),
                              inputs.size(), lm_output_names_ptr_.data(),
                              lm_output_names_ptr_.size());
+    return std::move(out[0]);
+  }
+
+  std::vector<Ort::Value> RunLMPrefix(Ort::Value input_ids,
+                                      Ort::Value audio_mask,
+                                      Ort::Value attention_mask,
+                                      Ort::Value position_ids) {
+    std::vector<Ort::Value> inputs;
+    inputs.reserve(4);
+    inputs.push_back(std::move(input_ids));
+    inputs.push_back(std::move(audio_mask));
+    inputs.push_back(std::move(attention_mask));
+    inputs.push_back(std::move(position_ids));
+
+    return pref_sess_->Run({}, pref_input_names_ptr_.data(), inputs.data(),
+                           inputs.size(), pref_output_names_ptr_.data(),
+                           pref_output_names_ptr_.size());
+  }
+
+  Ort::Value RunLMTarget(Ort::Value input_ids, Ort::Value audio_mask,
+                         Ort::Value attention_mask, Ort::Value position_ids,
+                         std::vector<Ort::Value> past) {
+    std::vector<Ort::Value> inputs;
+    inputs.reserve(4 + past.size());
+    inputs.push_back(std::move(input_ids));
+    inputs.push_back(std::move(audio_mask));
+    inputs.push_back(std::move(attention_mask));
+    inputs.push_back(std::move(position_ids));
+    for (auto &p : past) inputs.push_back(std::move(p));
+
+    auto out = tgt_sess_->Run({}, tgt_input_names_ptr_.data(), inputs.data(),
+                              inputs.size(), tgt_output_names_ptr_.data(),
+                              tgt_output_names_ptr_.size());
     return std::move(out[0]);
   }
 
@@ -152,6 +209,36 @@ class OfflineTtsOmnivoiceModel::Impl {
                dec_output_names_);
   }
 
+  void InitPref(void *data, size_t data_len) {
+    if (data) {
+      pref_sess_ =
+          std::make_unique<Ort::Session>(env_, data, data_len, sess_opts_);
+    } else if (!pref_sess_) {
+      SHERPA_ONNX_LOGE("prefix session not initialized");
+      SHERPA_ONNX_EXIT(-1);
+    }
+    GetInputNames(pref_sess_.get(), &pref_input_names_,
+                  &pref_input_names_ptr_);
+    GetOutputNames(pref_sess_.get(), &pref_output_names_,
+                   &pref_output_names_ptr_);
+    DebugPrint("prefix", pref_sess_.get(), pref_input_names_,
+               pref_output_names_);
+  }
+
+  void InitTgt(void *data, size_t data_len) {
+    if (data) {
+      tgt_sess_ =
+          std::make_unique<Ort::Session>(env_, data, data_len, sess_opts_);
+    } else if (!tgt_sess_) {
+      SHERPA_ONNX_LOGE("target session not initialized");
+      SHERPA_ONNX_EXIT(-1);
+    }
+    GetInputNames(tgt_sess_.get(), &tgt_input_names_, &tgt_input_names_ptr_);
+    GetOutputNames(tgt_sess_.get(), &tgt_output_names_,
+                   &tgt_output_names_ptr_);
+    DebugPrint("target", tgt_sess_.get(), tgt_input_names_, tgt_output_names_);
+  }
+
   void DebugPrint(const char *tag, Ort::Session *sess,
                   const std::vector<std::string> &ins,
                   const std::vector<std::string> &outs) {
@@ -195,6 +282,18 @@ class OfflineTtsOmnivoiceModel::Impl {
   std::vector<std::string> dec_output_names_;
   std::vector<const char *> dec_output_names_ptr_;
 
+  std::unique_ptr<Ort::Session> pref_sess_;
+  std::vector<std::string> pref_input_names_;
+  std::vector<const char *> pref_input_names_ptr_;
+  std::vector<std::string> pref_output_names_;
+  std::vector<const char *> pref_output_names_ptr_;
+
+  std::unique_ptr<Ort::Session> tgt_sess_;
+  std::vector<std::string> tgt_input_names_;
+  std::vector<const char *> tgt_input_names_ptr_;
+  std::vector<std::string> tgt_output_names_;
+  std::vector<const char *> tgt_output_names_ptr_;
+
   OfflineTtsOmnivoiceModelMetaData meta_data_;
 };
 
@@ -220,6 +319,26 @@ Ort::Value OfflineTtsOmnivoiceModel::RunLM(Ort::Value input_ids,
                                            Ort::Value position_ids) const {
   return impl_->RunLM(std::move(input_ids), std::move(audio_mask),
                       std::move(attention_mask), std::move(position_ids));
+}
+
+bool OfflineTtsOmnivoiceModel::HasCachedLM() const {
+  return impl_->HasCachedLM();
+}
+
+std::vector<Ort::Value> OfflineTtsOmnivoiceModel::RunLMPrefix(
+    Ort::Value input_ids, Ort::Value audio_mask, Ort::Value attention_mask,
+    Ort::Value position_ids) const {
+  return impl_->RunLMPrefix(std::move(input_ids), std::move(audio_mask),
+                            std::move(attention_mask),
+                            std::move(position_ids));
+}
+
+Ort::Value OfflineTtsOmnivoiceModel::RunLMTarget(
+    Ort::Value input_ids, Ort::Value audio_mask, Ort::Value attention_mask,
+    Ort::Value position_ids, std::vector<Ort::Value> past) const {
+  return impl_->RunLMTarget(std::move(input_ids), std::move(audio_mask),
+                            std::move(attention_mask),
+                            std::move(position_ids), std::move(past));
 }
 
 Ort::Value OfflineTtsOmnivoiceModel::EncodeAudio(Ort::Value pcm) const {

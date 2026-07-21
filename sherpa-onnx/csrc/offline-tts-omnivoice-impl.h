@@ -336,32 +336,155 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
 
     // --- 6. MaskGIT loop ---------------------------------------------------
     const int32_t V = m.audio_vocab_size;
+
+    // Cached-LM fast path: run the prefix graph once to obtain K/V for the
+    // [style|text|ref_codes] span, then per step run the target graph on the
+    // batch-1 target span with those cached K/V. The uncond branch still uses
+    // the original single-graph LM because uncond has no prefix by
+    // construction (its "sequence" is just the target mask region).
+    const bool cached = model_->HasCachedLM();
+    const int32_t prefix_len = cond_target_start;
+
+    struct KVBuf {
+      std::vector<int64_t> shape;
+      std::vector<float> data;
+    };
+    std::vector<KVBuf> past_bufs;
+
+    // Per-step batch-1 target/uncond buffers (reused).
+    std::vector<int64_t> tgt_ids, unc_ids, tgt_attn, tgt_pos, unc_attn, unc_pos;
+    std::vector<uint8_t> tgt_am, unc_am;
+
+    if (cached) {
+      tgt_ids.assign(C * num_target_tokens, mask_id);
+      unc_ids.assign(C * num_target_tokens, mask_id);
+      tgt_am.assign(num_target_tokens, 1);
+      unc_am.assign(num_target_tokens, 1);
+      tgt_attn.assign(prefix_len + num_target_tokens, 1);
+      unc_attn.assign(num_target_tokens, 1);
+      tgt_pos.resize(num_target_tokens);
+      unc_pos.resize(num_target_tokens);
+      for (int32_t i = 0; i < num_target_tokens; ++i) {
+        tgt_pos[i] = prefix_len + i;
+        unc_pos[i] = i;
+      }
+
+      std::vector<int64_t> pref_ids(C * prefix_len, mask_id);
+      std::vector<uint8_t> pref_am(prefix_len, 0);
+      std::vector<int64_t> pref_attn(prefix_len, 1);
+      std::vector<int64_t> pref_pos(prefix_len, 0);
+      for (int32_t c = 0; c < C; ++c) {
+        int64_t *dst = pref_ids.data() + c * prefix_len;
+        std::copy(style_ids.begin(), style_ids.end(), dst);
+        std::copy(text_ids.begin(), text_ids.end(), dst + n_style);
+        std::copy(ref_codes.begin() + c * ref_tok_len,
+                  ref_codes.begin() + (c + 1) * ref_tok_len,
+                  dst + cond_audio_start);
+      }
+      for (int32_t i = 0; i < prefix_len; ++i) {
+        pref_am[i] = (i >= cond_audio_start) ? 1 : 0;
+        pref_pos[i] = i;
+      }
+      auto raw = model_->RunLMPrefix(
+          MakeI64Tensor(pref_ids, {1, C, prefix_len}),
+          MakeBoolTensor(pref_am, {1, prefix_len}),
+          MakeI64Tensor(pref_attn, {1, prefix_len}),
+          MakeI64Tensor(pref_pos, {1, prefix_len}));
+      past_bufs.reserve(raw.size());
+      for (auto &t : raw) {
+        auto sh = t.GetTensorTypeAndShapeInfo().GetShape();
+        int64_t n = 1;
+        for (auto d : sh) n *= d;
+        KVBuf b;
+        b.shape.assign(sh.begin(), sh.end());
+        const float *src = t.GetTensorData<float>();
+        b.data.assign(src, src + n);
+        past_bufs.push_back(std::move(b));
+      }
+      if (config_.model.debug) {
+        SHERPA_ONNX_LOGE(
+            "omnivoice: cached KV built, %d tensors, prefix_len=%d",
+            static_cast<int32_t>(past_bufs.size()), prefix_len);
+      }
+    }
+
     for (int32_t step = 0; step < num_steps; ++step) {
       int32_t k = schedule[step];
       if (k <= 0) continue;
 
-      // Refresh cond target region and uncond region from current tokens.
-      for (int32_t c = 0; c < C; ++c) {
-        std::copy(tokens.begin() + c * num_target_tokens,
-                  tokens.begin() + (c + 1) * num_target_tokens,
-                  row_ids(0, c) + cond_target_start);
-        std::copy(tokens.begin() + c * num_target_tokens,
-                  tokens.begin() + (c + 1) * num_target_tokens,
-                  row_ids(1, c));
+      const float *cond_lp = nullptr;
+      const float *uncond_lp = nullptr;
+      int64_t cond_stride_c = 0, cond_stride_s = 0;
+      int64_t uncond_stride_c = 0, uncond_stride_s = 0;
+      int32_t cond_t_off = 0;
+      // Hold logits alive across the confidence loop.
+      Ort::Value batched_logits{nullptr};
+      Ort::Value cond_logits{nullptr};
+      Ort::Value uncond_logits{nullptr};
+
+      if (cached) {
+        for (int32_t c = 0; c < C; ++c) {
+          std::copy(tokens.begin() + c * num_target_tokens,
+                    tokens.begin() + (c + 1) * num_target_tokens,
+                    tgt_ids.begin() + c * num_target_tokens);
+          std::copy(tokens.begin() + c * num_target_tokens,
+                    tokens.begin() + (c + 1) * num_target_tokens,
+                    unc_ids.begin() + c * num_target_tokens);
+        }
+        // Wrap owned past K/V buffers as fresh Ort::Values every step
+        // (Run consumes the input vector on return).
+        auto mem = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator,
+                                              OrtMemTypeDefault);
+        std::vector<Ort::Value> past_vals;
+        past_vals.reserve(past_bufs.size());
+        for (auto &b : past_bufs) {
+          past_vals.push_back(Ort::Value::CreateTensor<float>(
+              mem, b.data.data(), b.data.size(), b.shape.data(),
+              b.shape.size()));
+        }
+        cond_logits = model_->RunLMTarget(
+            MakeI64Tensor(tgt_ids, {1, C, num_target_tokens}),
+            MakeBoolTensor(tgt_am, {1, num_target_tokens}),
+            MakeI64Tensor(tgt_attn, {1, prefix_len + num_target_tokens}),
+            MakeI64Tensor(tgt_pos, {1, num_target_tokens}),
+            std::move(past_vals));
+        uncond_logits = model_->RunLM(
+            MakeI64Tensor(unc_ids, {1, C, num_target_tokens}),
+            MakeBoolTensor(unc_am, {1, num_target_tokens}),
+            MakeI64Tensor(unc_attn, {1, num_target_tokens}),
+            MakeI64Tensor(unc_pos, {1, num_target_tokens}));
+        cond_lp = cond_logits.GetTensorData<float>();
+        uncond_lp = uncond_logits.GetTensorData<float>();
+        cond_stride_c = static_cast<int64_t>(num_target_tokens) * V;
+        cond_stride_s = V;
+        uncond_stride_c = cond_stride_c;
+        uncond_stride_s = V;
+        cond_t_off = 0;
+      } else {
+        // Refresh cond target region and uncond region from current tokens.
+        for (int32_t c = 0; c < C; ++c) {
+          std::copy(tokens.begin() + c * num_target_tokens,
+                    tokens.begin() + (c + 1) * num_target_tokens,
+                    row_ids(0, c) + cond_target_start);
+          std::copy(tokens.begin() + c * num_target_tokens,
+                    tokens.begin() + (c + 1) * num_target_tokens,
+                    row_ids(1, c));
+        }
+        batched_logits = model_->RunLM(
+            MakeI64Tensor(input_ids, {2, C, max_len}),
+            MakeBoolTensor(audio_mask, {2, max_len}),
+            MakeI64Tensor(attn_mask, {2, max_len}),
+            MakeI64Tensor(pos_ids, {2, max_len}));
+        const float *lp = batched_logits.GetTensorData<float>();
+        int64_t stride_b = static_cast<int64_t>(C) * max_len * V;
+        cond_lp = lp;
+        uncond_lp = lp + stride_b;
+        cond_stride_c = static_cast<int64_t>(max_len) * V;
+        cond_stride_s = V;
+        uncond_stride_c = cond_stride_c;
+        uncond_stride_s = V;
+        cond_t_off = cond_target_start;
       }
-
-      Ort::Value logits = model_->RunLM(
-          MakeI64Tensor(input_ids, {2, C, max_len}),
-          MakeBoolTensor(audio_mask, {2, max_len}),
-          MakeI64Tensor(attn_mask, {2, max_len}),
-          MakeI64Tensor(pos_ids, {2, max_len}));
-
-      const float *lp = logits.GetTensorData<float>();
-      auto lshape = logits.GetTensorTypeAndShapeInfo().GetShape();
-      // Expect [2, C, max_len, V]
-      int64_t stride_b = C * max_len * V;
-      int64_t stride_c = max_len * V;
-      int64_t stride_s = V;
 
       // For each still-masked position (c, t) compute confidence + best id
       // via classifier-free guidance. Stash predictions in a flat vector.
@@ -375,10 +498,9 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
           if (tokens[idx] != mask_id) continue;
 
           const float *c_row =
-              lp + 0 * stride_b + c * stride_c +
-              (cond_target_start + t) * stride_s;
+              cond_lp + c * cond_stride_c + (cond_t_off + t) * cond_stride_s;
           const float *u_row =
-              lp + 1 * stride_b + c * stride_c + t * stride_s;
+              uncond_lp + c * uncond_stride_c + t * uncond_stride_s;
 
           std::vector<float> log_probs =
               GuidedLogProbs(c_row, u_row, V, guidance_scale);
