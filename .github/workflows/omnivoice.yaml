@@ -1,0 +1,89 @@
+# Copyright (c)  2026  Xiaomi Corporation
+#                2026  Waad Ben Kheder
+#
+# Builds sherpa-onnx with TTS enabled and runs the OmniVoice unit tests
+# (text-weight + text-splitter). Does not run the full end-to-end test at
+# scripts/omnivoice/test_e2e.sh -- that one needs a bundle and is gated
+# on SHERPA_ONNX_OMNIVOICE_BUNDLE_DIR, which is only set on self-hosted
+# runners that host the model.
+
+name: omnivoice
+
+on:
+  push:
+    branches:
+      - master
+      - omnivoice*
+    paths:
+      - 'sherpa-onnx/csrc/offline-tts-omnivoice-**'
+      - 'sherpa-onnx/csrc/offline-tts-impl.cc'
+      - 'sherpa-onnx/csrc/offline-tts-model-config.*'
+      - 'sherpa-onnx/csrc/sherpa-onnx-offline-tts.cc'
+      - 'sherpa-onnx/csrc/CMakeLists.txt'
+      - 'scripts/omnivoice/**'
+      - '.github/workflows/omnivoice.yaml'
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'sherpa-onnx/csrc/offline-tts-omnivoice-**'
+      - 'sherpa-onnx/csrc/offline-tts-impl.cc'
+      - 'sherpa-onnx/csrc/offline-tts-model-config.*'
+      - 'sherpa-onnx/csrc/sherpa-onnx-offline-tts.cc'
+      - 'sherpa-onnx/csrc/CMakeLists.txt'
+      - 'scripts/omnivoice/**'
+      - '.github/workflows/omnivoice.yaml'
+  workflow_dispatch:
+
+concurrency:
+  group: omnivoice-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps (linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build build-essential
+
+      - name: Install build deps (macos)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install cmake ninja || true
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSHERPA_ONNX_ENABLE_TTS=ON \
+            -DSHERPA_ONNX_ENABLE_TESTS=ON \
+            -DSHERPA_ONNX_ENABLE_PYTHON=OFF \
+            -DBUILD_SHARED_LIBS=OFF
+
+      - name: Build core + CLI + tests
+        run: |
+          cmake --build build --target \
+            sherpa-onnx-offline-tts \
+            offline-tts-omnivoice-text-weight-test \
+            offline-tts-omnivoice-text-splitter-test \
+            -j 3
+
+      - name: Run OmniVoice unit tests
+        run: |
+          ctest --test-dir build -R 'offline-tts-omnivoice' --output-on-failure
+
+      - name: Confirm OmniVoice CLI flags parse
+        run: |
+          ./build/bin/sherpa-onnx-offline-tts --help 2>&1 | \
+            grep -E '(--omnivoice-model|--split-strategy|--output-stream|--seed)' || \
+            (echo "OmniVoice CLI flags missing"; exit 1)
