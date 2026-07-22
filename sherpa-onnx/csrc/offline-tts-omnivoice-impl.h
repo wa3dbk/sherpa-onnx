@@ -21,6 +21,7 @@
 #include "sherpa-onnx/csrc/offline-tts-impl.h"
 #include "sherpa-onnx/csrc/offline-tts-omnivoice-model-config.h"
 #include "sherpa-onnx/csrc/offline-tts-omnivoice-model.h"
+#include "sherpa-onnx/csrc/offline-tts-omnivoice-ref-cache.h"
 #include "sherpa-onnx/csrc/offline-tts-omnivoice-text-splitter.h"
 #include "sherpa-onnx/csrc/offline-tts-omnivoice-text-weight.h"
 #include "sherpa-onnx/csrc/onnx-utils.h"
@@ -237,6 +238,30 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
         }
       }
     }
+    // Second-chance lookup in the on-disk cache before we hit the codec.
+    // The disk cache is process-shared, so a serving worker restart or a
+    // fresh CLI invocation still avoids the encoder forward for known
+    // clips. Only checked if the in-process cache missed.
+    if (ref_tok_len == 0 && cache_enabled) {
+      std::vector<int64_t> loaded;
+      int32_t nt = disk_cache_.TryLoad(ref_hash, config.reference_sample_rate,
+                                       static_cast<int32_t>(
+                                           config.reference_audio.size()),
+                                       m.num_codebook, &loaded);
+      if (nt > 0) {
+        ref_codes = std::move(loaded);
+        ref_tok_len = nt;
+        if (config_.model.debug) {
+          SHERPA_ONNX_LOGE("omnivoice: disk cache hit (%d tokens)", nt);
+        }
+        std::lock_guard<std::mutex> lock(ref_cache_mutex_);
+        ref_cache_key_ = ref_hash;
+        ref_cache_codes_ = ref_codes;
+        ref_cache_tok_len_ = ref_tok_len;
+        ref_cache_valid_ = true;
+      }
+    }
+
     if (ref_tok_len == 0) {
       std::vector<float> pcm =
           Resample(config.reference_audio.data(),
@@ -263,6 +288,10 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
         ref_cache_codes_ = ref_codes;
         ref_cache_tok_len_ = ref_tok_len;
         ref_cache_valid_ = true;
+        disk_cache_.TryStore(ref_hash, config.reference_sample_rate,
+                             static_cast<int32_t>(
+                                 config.reference_audio.size()),
+                             m.num_codebook, ref_codes, ref_tok_len);
       }
     }
 
@@ -829,6 +858,12 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
   mutable bool ref_cache_valid_ = false;
   mutable std::vector<int64_t> ref_cache_codes_;
   mutable int32_t ref_cache_tok_len_ = 0;
+
+  // Cross-process disk cache. Auto-picks $SHERPA_ONNX_OMNIVOICE_CACHE_DIR
+  // then $XDG_CACHE_HOME/sherpa-onnx-omnivoice then
+  // $HOME/.cache/sherpa-onnx-omnivoice. Set the env var to "off" to
+  // disable. Silently no-ops if the dir is not writable.
+  OmnivoiceRefDiskCache disk_cache_;
 };
 
 }  // namespace sherpa_onnx
