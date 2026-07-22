@@ -4,6 +4,7 @@
 
 #include <chrono>  // NOLINT
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <string>
 #include <utility>
@@ -14,9 +15,30 @@
 #include "sherpa-onnx/csrc/wave-reader.h"
 #include "sherpa-onnx/csrc/wave-writer.h"
 
-static int32_t AudioCallback(const float * /*samples*/, int32_t n,
-                             float progress) {
-  printf("sample=%d, progress=%f\n", n, progress);
+// Streaming mode: when non-zero, the callback writes raw float32 little-endian
+// PCM chunks to stdout as they arrive from the decoder. Progress ticks (n==0)
+// are ignored. Set once from main() before Generate() runs.
+static bool g_stream_stdout = false;
+
+static int32_t AudioCallback(const float *samples, int32_t n, float progress) {
+  if (g_stream_stdout) {
+    if (n > 0 && samples != nullptr) {
+      // Raw float32 little-endian. Consumers: `ffplay -f f32le -ar <SR> -i -`
+      // or `aplay -f FLOAT_LE -c 1 -r <SR>`. Sample rate goes to stderr.
+      size_t w = std::fwrite(samples, sizeof(float), static_cast<size_t>(n),
+                             stdout);
+      if (w != static_cast<size_t>(n)) {
+        // Consumer closed the pipe (e.g. user hit q in ffplay). Tell the TTS
+        // backend to abort by returning 0.
+        return 0;
+      }
+      std::fflush(stdout);
+      fprintf(stderr, "stream: +%d samples, progress=%.1f%%\n", n,
+              progress * 100.f);
+    }
+    return 1;
+  }
+  fprintf(stderr, "sample=%d, progress=%f\n", n, progress);
   return 1;
 }
 
@@ -140,6 +162,35 @@ or details.
               "Speech speed. Larger=faster. Used by Supertonic, VITS, etc. "
               "(float, default = 1.0)");
 
+  bool output_stream = false;
+  po.Register("output-stream", &output_stream,
+              "If true, write raw float32 little-endian PCM to stdout as each "
+              "decoded chunk arrives, and skip the --output-filename WAV. "
+              "Sample rate is printed to stderr. Example: "
+              "`sherpa-onnx-offline-tts --output-stream=1 ... 'hello' | "
+              "ffplay -f f32le -ar 24000 -i -`. OmniVoice only; other TTS "
+              "backends currently deliver PCM only after decode completes.");
+
+  std::string split_strategy;
+  po.Register(
+      "split-strategy", &split_strategy,
+      "OmniVoice only. Text chunking strategy: 'none' (default), 'sentence' "
+      "(split at . ! ? and CJK equivalents; best prosody), or 'chars' (hard "
+      "byte-limit chunks; safest for unpunctuated input). See docs.");
+
+  int32_t split_max_chars = 0;
+  po.Register(
+      "split-max-chars", &split_max_chars,
+      "OmniVoice only. Max bytes per chunk when --split-strategy is set. "
+      "Default 200. Ignored otherwise.");
+
+  int32_t seed = -1;
+  po.Register(
+      "seed", &seed,
+      "OmniVoice only. RNG seed for MaskGIT position sampling. Negative "
+      "(default) means non-deterministic. Set to a non-negative integer for "
+      "byte-identical output across runs.");
+
   sherpa_onnx::OfflineTtsConfig config;
 
   config.Register(&po);
@@ -214,6 +265,29 @@ or details.
     gen_config.reference_text = reference_text;
   }
 
+  if (is_omnivoice_tts) {
+    if (!split_strategy.empty()) {
+      gen_config.extra["split_strategy"] = split_strategy;
+    }
+    if (split_max_chars > 0) {
+      gen_config.extra["split_max_chars"] = std::to_string(split_max_chars);
+    }
+    if (seed >= 0) {
+      gen_config.extra["seed"] = std::to_string(seed);
+    }
+  }
+
+  if (output_stream) {
+    if (!is_omnivoice_tts) {
+      fprintf(stderr,
+              "--output-stream is currently only useful with OmniVoice; "
+              "other backends deliver PCM only after decode completes.\n");
+    }
+    g_stream_stdout = true;
+    fprintf(stderr, "stream: sample_rate=%d format=f32le\n",
+            tts.SampleRate());
+  }
+
   audio = tts.Generate(po.GetArg(1), gen_config, AudioCallback);
 
   const auto end = std::chrono::steady_clock::now();
@@ -237,6 +311,14 @@ or details.
   fprintf(stderr, "Audio duration: %.3f s\n", duration);
   fprintf(stderr, "Real-time factor (RTF): %.3f/%.3f = %.3f\n", elapsed_seconds,
           duration, rtf);
+
+  if (output_stream) {
+    // Already delivered via stdout; no WAV.
+    fprintf(stderr, "The text is: %s. Speaker ID: %d\n", po.GetArg(1).c_str(),
+            sid);
+    fprintf(stderr, "Streamed %zu samples to stdout.\n", audio.samples.size());
+    return 0;
+  }
 
   bool ok = sherpa_onnx::WriteWave(output_filename, audio.sample_rate,
                                    audio.samples.data(), audio.samples.size());

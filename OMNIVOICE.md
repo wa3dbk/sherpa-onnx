@@ -98,6 +98,107 @@ tuning:
 Build the cached ONNX pair with `WITH_CACHED=1 ./scripts/omnivoice/build_bundle.sh`
 (or run `scripts/omnivoice/export_omnivoice_cached_onnx.py` directly).
 
+## 3a. Long-form input: chunking strategies
+
+A single MaskGIT pass caps at ~60 s of output (25 tokens/s × 1500-token
+LM window). Beyond that, either the LM refuses the input or per-pass
+memory blows up. For paragraph-scale narration, opt into a splitter that
+breaks the text into pieces, runs one MaskGIT pass per piece, and
+concatenates the outputs.
+
+The reference-audio encoding is cached across pieces (see
+`cache_reference_audio`), so per-chunk cost is dominated by the LM and
+codec-decoder forwards, not the codec encoder.
+
+| `--split-strategy` | When to use | Tradeoffs |
+| --- | --- | --- |
+| `none` *(default)* | Short single-sentence inputs, or when you're managing chunks yourself in the caller. | Fastest — one pass. Fails hard once you cross the 60 s cap. |
+| `sentence` | Well-punctuated prose (novels, articles, transcripts). | Best prosody: breaks land on `.`/`!`/`?` (and `。`/`！`/`？`), which is where humans pause anyway. Overlong single sentences fall back to `chars` for just that sentence. |
+| `chars` | Unpunctuated or adversarial input: URLs, IDs, phone numbers, generated text with no full stops. | Guarantees a bound on per-chunk cost. Prefers whitespace / `,` / `;` breaks near the limit and never splits a UTF-8 code point. Prosody joins may be audible mid-clause. |
+
+Extra flags:
+
+- `--split-max-chars=200` — byte limit per chunk. 200 is a safe default for
+  a 32-step MaskGIT run; raise it for longer chunks (fewer joins, more
+  cost per chunk) or lower it if you see the "target length exceeds cap"
+  warning even after chunking.
+- `--extra="chunk_gap_ms=60"` — silence inserted between chunks. 60 ms is
+  about a comma-length pause. Set 0 for no gap, or 150-200 for a fuller
+  breath between sentences.
+
+Chunking is per-request: chunk 1 finishes MaskGIT + decode, its audio
+streams to the callback / stdout, then chunk 2 starts. With
+`--output-stream=1` this gives you first-audio-out latency proportional
+to the *first chunk*, not the whole paragraph. That is the main reason
+to prefer `sentence` over `none` for interactive use even when the
+paragraph would technically fit in one pass.
+
+## 3b. Streaming output
+
+`--output-stream=1` writes raw **float32 little-endian** PCM to stdout as
+each decoded chunk arrives. The output sample rate (always 24 000 Hz for
+the current OmniVoice bundle) is printed to stderr on startup. In this
+mode, `--output-filename` is ignored — no WAV is written.
+
+```bash
+./bin/sherpa-onnx-offline-tts \
+  --omnivoice-model=./bundle/omnivoice.onnx \
+  ...
+  --split-strategy=sentence \
+  --output-stream=1 \
+  "First sentence to play. Second sentence, also long. Third." \
+  | ffplay -f f32le -ar 24000 -i - -nodisp -autoexit
+```
+
+Or with `aplay`:
+
+```bash
+... --output-stream=1 "Hello world" | aplay -f FLOAT_LE -c 1 -r 24000
+```
+
+Two things to know:
+
+1. The Higgs codec decoder is a single ONNX graph, so within one MaskGIT
+   pass audio can only start streaming *after* that pass finishes. The
+   PCM then arrives in `chunk_ms`-sized slices (default 500 ms). Combined
+   with `--split-strategy=sentence`, this means you hear the first
+   sentence roughly one MaskGIT+decode later — not after the whole
+   paragraph.
+2. If the downstream consumer closes the pipe (e.g. you hit `q` in
+   `ffplay`), the write fails, the callback returns 0, and the backend
+   aborts the current chunk cleanly.
+
+## 3c. Determinism
+
+MaskGIT unmask-order sampling uses Gumbel noise driven by a
+`std::mt19937`. Passing `--seed=<N>` (any non-negative integer) makes the
+whole pipeline reproducible: two runs with the same bundle, the same
+text, the same reference clip, and the same seed produce **byte-identical**
+WAVs. This is what the `scripts/omnivoice/test_e2e.sh` determinism check
+asserts.
+
+Notes:
+
+- `--seed=-1` (the default) reseeds from `std::random_device` each
+  request, so consecutive runs vary as intended.
+- Determinism also requires `--num-threads` and the ONNX Runtime
+  execution provider to be stable across runs. On CPU with a fixed
+  thread count this holds. On GPU (`--provider=cuda`) atomic reductions
+  in some kernels may perturb the last few bits — determinism is
+  best-effort there.
+- The RNG feeds *position sampling only*, not the CFG logit combination,
+  so `--seed` does not interact with `--omnivoice-guidance-scale` or the
+  layer penalty.
+
+## 3d. Reference audio sample rate
+
+Anything readable by `sherpa-onnx-offline-tts` works: mono or stereo, 16
+kHz, 22.05 kHz, 44.1 kHz, 48 kHz. The impl calls the sherpa-onnx
+`LinearResample` to convert to the codec's native 24 kHz before
+encoding, so **you do not need to resample yourself**. The one thing
+that still matters is duration: keep the clip in the 3-10 s range for
+clean speaker capture (hard error below 0.5 s, warning above 30 s).
+
 ## 4. Troubleshooting
 
 Enable verbose logging on any run to see the estimated target length, the
@@ -123,7 +224,8 @@ wildly off, the rest of the output will be too.
 | Output has correct words but 3-4× longer than expected, padded with silence / hisses | `--reference-text` does not match the actual content of `--reference-audio` (duration estimator is scaled by the ref-text:ref-tok ratio) | Transcribe the reference clip accurately, or supply `--extra="duration_sec=3.5"` |
 | `"omnivoice: reference_audio is only 0.320 s"` | Reference clip too short for the codec to build a speaker embedding | Use a 3-10 s clip of clean speech |
 | `"codec encoder produced 0 reference tokens"` | Reference clip is silent or all-zero | Sanity-check the wav |
-| `"target length N tokens exceeds cap"` | Text too long for a single MaskGIT pass | Split input at sentence boundaries and concatenate outputs |
+| `"target length N tokens exceeds cap"` | Text too long for a single MaskGIT pass | Add `--split-strategy=sentence` (or `chars` for unpunctuated input); see §3a |
+| Chunked output has audible clicks / breath pops at sentence joins | `chunk_gap_ms` too short or reference clip clipped at its ends | Try `--extra="chunk_gap_ms=120"`; trim the reference wav so it starts and ends on silence |
 | `"'.../tokenizer/vocab.json' does not exist"` | The upstream HF repo ships only the fast `tokenizer.json`; you skipped the slow-format conversion | Run `scripts/omnivoice/export_tokenizer.py` (or the full `build_bundle.sh`) |
 | Cloned voice sounds nothing like the reference | Reference is too noisy, or `--extra="denoise=0"` was passed on a noisy clip | Try `denoise=1` (default) or a cleaner clip |
 | Non-English text produces wrong prosody | Language tag defaulting to `"None"` | Pass `--extra="language=zh"` (or `en`, `ja`, …) as expected by the training data |
@@ -143,9 +245,16 @@ sherpa-onnx/csrc/offline-tts-omnivoice-model-meta-data.h     shape/vocab constan
 sherpa-onnx/csrc/offline-tts-omnivoice-model.{h,cc}          three-session PIMPL wrapper
                                                              (RunLM, EncodeAudio, DecodeCodes)
 sherpa-onnx/csrc/offline-tts-omnivoice-impl.h                MaskGIT generation loop with
-                                                             optional classifier-free guidance
-                                                             and rule-based duration estimator
+                                                             optional classifier-free guidance,
+                                                             rule-based duration estimator,
+                                                             sentence/char chunking
+sherpa-onnx/csrc/offline-tts-omnivoice-text-splitter.h       kNone / kSentence / kChars
+sherpa-onnx/csrc/offline-tts-omnivoice-text-splitter-test.cc gtest
+sherpa-onnx/csrc/offline-tts-omnivoice-text-weight.h         per-script char weights
 scripts/omnivoice/                                           export scripts + build_bundle.sh
+scripts/omnivoice/test_e2e.sh                                bundle-gated end-to-end test
+                                                             (basic run, determinism, chunking,
+                                                             --output-stream)
 ```
 
 ### Modified files

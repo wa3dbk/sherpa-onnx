@@ -21,6 +21,7 @@
 #include "sherpa-onnx/csrc/offline-tts-impl.h"
 #include "sherpa-onnx/csrc/offline-tts-omnivoice-model-config.h"
 #include "sherpa-onnx/csrc/offline-tts-omnivoice-model.h"
+#include "sherpa-onnx/csrc/offline-tts-omnivoice-text-splitter.h"
 #include "sherpa-onnx/csrc/offline-tts-omnivoice-text-weight.h"
 #include "sherpa-onnx/csrc/onnx-utils.h"
 #include "sherpa-onnx/csrc/qwen-asr-tokenizer.h"
@@ -79,12 +80,88 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
   //   "chunk_ms"          (int) - streaming chunk size in ms for the
   //       GeneratedAudioCallback (default 500). Also emits progress-only
   //       ticks (n=0) after each MaskGIT step.
+  //   "split_strategy"    (string) - "none" (default), "sentence", or "chars".
+  //       When != "none", the input text is split into pieces that are
+  //       synthesized in independent MaskGIT passes and concatenated. See
+  //       offline-tts-omnivoice-text-splitter.h for the tradeoffs. All
+  //       pieces reuse the cached reference-audio encoding, so per-chunk
+  //       cost is dominated by the LM forward, not the codec encoder.
+  //   "split_max_chars"   (int) - max bytes per chunk when split_strategy
+  //       is set (default 200). Ignored otherwise.
+  //   "chunk_gap_ms"      (int) - silence to insert between chunks when
+  //       chunking is on (default 60 ms). Small pause hides prosody joins.
   GeneratedAudio Generate(
       const std::string &text, const GenerationConfig &config,
       GeneratedAudioCallback callback = nullptr) const override {
+    OmnivoiceSplitStrategy strategy = ParseOmnivoiceSplitStrategy(
+        config.GetExtraString("split_strategy", "none"));
+    if (strategy == OmnivoiceSplitStrategy::kNone) {
+      return GenerateOne(text, config, callback, 0.0f, 1.0f);
+    }
+
+    int32_t max_chars = config.GetExtraInt("split_max_chars", 200);
+    auto chunks = SplitOmnivoiceText(text, strategy, max_chars);
+    if (chunks.empty()) {
+      SHERPA_ONNX_LOGE("omnivoice: empty text after split");
+      return {};
+    }
+    if (chunks.size() == 1) {
+      return GenerateOne(chunks[0], config, callback, 0.0f, 1.0f);
+    }
+
+    int32_t gap_ms = std::max(0, config.GetExtraInt("chunk_gap_ms", 60));
+    const int32_t sr = model_->GetMetaData().sample_rate;
+    const int32_t gap_samples = sr * gap_ms / 1000;
+
+    // Weight per-chunk progress by chunk byte length so the overall bar
+    // moves at ~constant speed even when chunks are uneven.
+    int64_t total_bytes = 0;
+    for (const auto &c : chunks) total_bytes += static_cast<int64_t>(c.size());
+    if (total_bytes <= 0) total_bytes = 1;
+
+    GeneratedAudio out;
+    out.sample_rate = sr;
+    float progress_base = 0.0f;
+
+    for (size_t i = 0; i < chunks.size(); ++i) {
+      float span =
+          static_cast<float>(chunks[i].size()) / static_cast<float>(total_bytes);
+      GeneratedAudio piece =
+          GenerateOne(chunks[i], config, callback, progress_base, span);
+      progress_base += span;
+      if (piece.samples.empty()) {
+        // Caller aborted, or a chunk failed. Return whatever we already have.
+        return out;
+      }
+      out.samples.insert(out.samples.end(), piece.samples.begin(),
+                         piece.samples.end());
+      if (i + 1 < chunks.size() && gap_samples > 0) {
+        out.samples.insert(out.samples.end(), gap_samples, 0.0f);
+      }
+    }
+    return out;
+  }
+
+ private:
+  // Single MaskGIT pass. `progress_base` and `progress_span` let the outer
+  // chunking loop remap the [0, 1] callback progress into a slice of the
+  // whole-request bar, so callers still see monotonic 0 -> 100%.
+  GeneratedAudio GenerateOne(
+      const std::string &text, const GenerationConfig &config,
+      GeneratedAudioCallback callback, float progress_base,
+      float progress_span) const {
     if (config_.model.debug) {
       SHERPA_ONNX_LOGE("omnivoice: %s", config.ToString().c_str());
     }
+
+    GeneratedAudioCallback wrapped_cb;
+    if (callback && (progress_base != 0.0f || progress_span != 1.0f)) {
+      wrapped_cb = [callback, progress_base, progress_span](
+                       const float *s, int32_t n, float p) {
+        return callback(s, n, progress_base + progress_span * p);
+      };
+    }
+    GeneratedAudioCallback cb = wrapped_cb ? wrapped_cb : callback;
 
     if (config.reference_audio.empty() || config.reference_sample_rate <= 0) {
       SHERPA_ONNX_LOGE("omnivoice requires reference_audio + reference_sample_rate");
@@ -554,11 +631,11 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
       // progress bar and give them a chance to abort. Cap at
       // kMaskGitProgressFrac so the chunked-decode phase can fill the
       // remaining fraction as real samples arrive.
-      if (callback) {
+      if (cb) {
         constexpr float kMaskGitProgressFrac = 0.9f;
         float p = kMaskGitProgressFrac *
                   (static_cast<float>(step + 1) / num_steps);
-        if (!callback(nullptr, 0, p)) {
+        if (!cb(nullptr, 0, p)) {
           if (config_.model.debug) {
             SHERPA_ONNX_LOGE(
                 "omnivoice: callback returned 0 during MaskGIT step %d; "
@@ -593,7 +670,7 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
     // PCM in ~500 ms chunks still lets the caller start playback ~one chunk
     // after decode ends instead of buffering the entire clip. Override via
     // extra "chunk_ms".
-    if (callback && n_samples > 0) {
+    if (cb && n_samples > 0) {
       int32_t chunk_ms = config.GetExtraInt("chunk_ms", 500);
       if (chunk_ms < 20) chunk_ms = 20;  // sub-20ms just wastes callbacks
       int64_t chunk_samples =
@@ -608,8 +685,8 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
         float p = kMaskGitProgressFrac +
                   kDecodeFrac *
                       (static_cast<float>(end) / static_cast<float>(n_samples));
-        if (!callback(ans.samples.data() + off,
-                      static_cast<int32_t>(end - off), p)) {
+        if (!cb(ans.samples.data() + off,
+                static_cast<int32_t>(end - off), p)) {
           // Caller asked to stop mid-stream. Return what we already produced
           // (up to the end of the last delivered chunk).
           if (config_.model.debug) {
@@ -626,7 +703,6 @@ class OfflineTtsOmnivoiceImpl : public OfflineTtsImpl {
     return ans;
   }
 
- private:
   // FNV-1a 64-bit over sample rate + count + raw PCM bytes. Fast enough
   // (~1 GB/s) that hashing 30 s of 24 kHz float is <3 ms, negligible next
   // to the codec forward it protects.

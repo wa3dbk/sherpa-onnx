@@ -849,6 +849,7 @@ if(SHERPA_ONNX_ENABLE_TESTS)
       piper-phonemize-test.cc
       offline-tts-supertonic-unicode-processor-test.cc
       offline-tts-omnivoice-text-weight-test.cc
+      offline-tts-omnivoice-text-splitter-test.cc
     )
   endif()
 
