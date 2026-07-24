@@ -33,7 +33,7 @@ docs at <https://k2-fsa.github.io/sherpa/onnx/>.
 | Model | Architecture | License | Status | Docs |
 |---|---|---|---|---|
 | **OmniVoice** | Qwen3-0.6B LM + Higgs-Audio-V2 codec, MaskGIT NAR | Apache 2.0 | ✅ Merged | [OMNIVOICE.md](OMNIVOICE.md) |
-| **F5-TTS** | Flow-matching DiT + Vocos vocoder | MIT | 🚧 In progress | — |
+| **F5-TTS** | Flow-matching DiT + Vocos vocoder | MIT | ✅ Merged | [F5-TTS.md](F5-TTS.md) |
 | **IndexTTS-2** | GPT-style LM + BigVGAN | Apache 2.0 | 📋 Planned | — |
 | **ChatterBox / Turbo** | LLaMA-backbone + S3 codec + HiFi-GAN | MIT | 📋 Planned | — |
 | everything from upstream (Piper VITS, Matcha, Kokoro, Kitten, Zipvoice, Pocket, Supertonic) | various | various | ✅ Inherited, unchanged | upstream docs |
@@ -63,15 +63,22 @@ Binaries land in `build/bin/`. The one you'll use most is
 
 ### Get a model bundle
 
-For OmniVoice today:
+For OmniVoice:
 
 ```bash
 scripts/omnivoice/build_bundle.sh              # downloads + assembles ~2 GB
 export BUNDLE_DIR=./sherpa-onnx-omnivoice-en
 ```
 
-For F5-TTS / IndexTTS-2 / ChatterBox: bundle scripts land as those models are
-integrated (see [Model status](#model-status)).
+For F5-TTS:
+
+```bash
+OUT_DIR=./sherpa-onnx-f5-tts-base-24khz bash scripts/f5-tts/build_bundle.sh
+export BUNDLE_DIR=./sherpa-onnx-f5-tts-base-24khz
+```
+
+For IndexTTS-2 / ChatterBox: bundle scripts land as those models are integrated
+(see [Model status](#model-status)).
 
 ### Try it — C++ (CLI)
 
@@ -243,6 +250,8 @@ Longer notes and background live next to the code:
 
 - [OMNIVOICE.md](OMNIVOICE.md) — MaskGIT decode loop, CFG, reference caching,
   chunking, streaming, determinism, sample-rate handling.
+- [F5-TTS.md](F5-TTS.md) — Euler ODE loop, sway sampling, CFG, duration
+  estimation, tokenizer notes.
 - [tests.md](tests.md) — 12-stage validation checklist to run on your cluster
   after each build.
 - `sherpa-onnx/csrc/offline-tts-*-model.cc` — per-backend implementations.
