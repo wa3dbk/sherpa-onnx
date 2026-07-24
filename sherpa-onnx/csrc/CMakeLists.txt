@@ -292,6 +292,8 @@ if(SHERPA_ONNX_ENABLE_TTS)
     matcha-tts-lexicon.cc
     melo-tts-lexicon.cc
     offline-tts-character-frontend.cc
+    offline-tts-f5-model-config.cc
+    offline-tts-f5-model.cc
     offline-tts-frontend.cc
     offline-tts-impl.cc
     offline-tts-kitten-model-config.cc
@@ -851,6 +853,7 @@ if(SHERPA_ONNX_ENABLE_TESTS)
       offline-tts-supertonic-unicode-processor-test.cc
       offline-tts-omnivoice-text-weight-test.cc
       offline-tts-omnivoice-text-splitter-test.cc
+      offline-tts-f5-model-config-test.cc
     )
   endif()
 

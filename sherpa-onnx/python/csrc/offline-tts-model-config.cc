@@ -8,6 +8,7 @@
 #include <string>
 
 #include "sherpa-onnx/csrc/offline-tts-model-config.h"
+#include "sherpa-onnx/python/csrc/offline-tts-f5-model-config.h"
 #include "sherpa-onnx/python/csrc/offline-tts-kitten-model-config.h"
 #include "sherpa-onnx/python/csrc/offline-tts-kokoro-model-config.h"
 #include "sherpa-onnx/python/csrc/offline-tts-matcha-model-config.h"
@@ -28,6 +29,7 @@ void PybindOfflineTtsModelConfig(py::module *m) {
   PybindOfflineTtsPocketModelConfig(m);
   PybindOfflineTtsSupertonicModelConfig(m);
   PybindOfflineTtsOmnivoiceModelConfig(m);
+  PybindOfflineTtsF5ModelConfig(m);
 
   using PyClass = OfflineTtsModelConfig;
 
@@ -40,7 +42,8 @@ void PybindOfflineTtsModelConfig(py::module *m) {
                     const OfflineTtsKittenModelConfig &,
                     const OfflineTtsPocketModelConfig &,
                     const OfflineTtsSupertonicModelConfig &,
-                    const OfflineTtsOmnivoiceModelConfig &, int32_t, bool,
+                    const OfflineTtsOmnivoiceModelConfig &,
+                    const OfflineTtsF5ModelConfig &, int32_t, bool,
                     const std::string &>(),
            py::arg("vits") = OfflineTtsVitsModelConfig{},
            py::arg("matcha") = OfflineTtsMatchaModelConfig{},
@@ -50,6 +53,7 @@ void PybindOfflineTtsModelConfig(py::module *m) {
            py::arg("pocket") = OfflineTtsPocketModelConfig{},
            py::arg("supertonic") = OfflineTtsSupertonicModelConfig{},
            py::arg("omnivoice") = OfflineTtsOmnivoiceModelConfig{},
+           py::arg("f5") = OfflineTtsF5ModelConfig{},
            py::arg("num_threads") = 1, py::arg("debug") = false,
            py::arg("provider") = "cpu")
       .def_readwrite("vits", &PyClass::vits)
@@ -60,6 +64,7 @@ void PybindOfflineTtsModelConfig(py::module *m) {
       .def_readwrite("pocket", &PyClass::pocket)
       .def_readwrite("supertonic", &PyClass::supertonic)
       .def_readwrite("omnivoice", &PyClass::omnivoice)
+      .def_readwrite("f5", &PyClass::f5)
       .def_readwrite("num_threads", &PyClass::num_threads)
       .def_readwrite("debug", &PyClass::debug)
       .def_readwrite("provider", &PyClass::provider)

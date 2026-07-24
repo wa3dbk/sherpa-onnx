@@ -76,6 +76,12 @@
     SHERPA_ONNX_DELETE_C_STR(c.model.omnivoice.prefix_model);   \
     SHERPA_ONNX_DELETE_C_STR(c.model.omnivoice.target_model);   \
                                                                 \
+    SHERPA_ONNX_DELETE_C_STR(c.model.f5.transformer);           \
+    SHERPA_ONNX_DELETE_C_STR(c.model.f5.vocoder);               \
+    SHERPA_ONNX_DELETE_C_STR(c.model.f5.tokens);                \
+    SHERPA_ONNX_DELETE_C_STR(c.model.f5.data_dir);              \
+    SHERPA_ONNX_DELETE_C_STR(c.model.f5.lexicon);               \
+                                                                \
     SHERPA_ONNX_DELETE_C_STR(c.model.provider);                 \
                                                                 \
     SHERPA_ONNX_DELETE_C_STR(c.rule_fsts);                      \
@@ -318,6 +324,31 @@ GetOfflineTtsOmnivoiceModelConfig(Napi::Object obj) {
   return c;
 }
 
+static SherpaOnnxOfflineTtsF5ModelConfig GetOfflineTtsF5ModelConfig(
+    Napi::Object obj) {
+  SherpaOnnxOfflineTtsF5ModelConfig c;
+  memset(&c, 0, sizeof(c));
+
+  if (!obj.Has("f5") || !obj.Get("f5").IsObject()) {
+    return c;
+  }
+
+  Napi::Object o = obj.Get("f5").As<Napi::Object>();
+
+  SHERPA_ONNX_ASSIGN_ATTR_STR(transformer, transformer);
+  SHERPA_ONNX_ASSIGN_ATTR_STR(vocoder, vocoder);
+  SHERPA_ONNX_ASSIGN_ATTR_STR(tokens, tokens);
+  SHERPA_ONNX_ASSIGN_ATTR_STR(data_dir, dataDir);
+  SHERPA_ONNX_ASSIGN_ATTR_STR(lexicon, lexicon);
+  SHERPA_ONNX_ASSIGN_ATTR_INT32(num_steps, numSteps);
+  SHERPA_ONNX_ASSIGN_ATTR_FLOAT(guidance_scale, guidanceScale);
+  SHERPA_ONNX_ASSIGN_ATTR_FLOAT(sway_coef, swayCoef);
+  SHERPA_ONNX_ASSIGN_ATTR_FLOAT(target_rms, targetRms);
+  SHERPA_ONNX_ASSIGN_ATTR_INT32(seed, seed);
+
+  return c;
+}
+
 static SherpaOnnxOfflineTtsModelConfig GetOfflineTtsModelConfig(
     Napi::Object obj) {
   SherpaOnnxOfflineTtsModelConfig c;
@@ -337,6 +368,7 @@ static SherpaOnnxOfflineTtsModelConfig GetOfflineTtsModelConfig(
   c.pocket = GetOfflineTtsPocketModelConfig(o);
   c.supertonic = GetOfflineTtsSupertonicModelConfig(o);
   c.omnivoice = GetOfflineTtsOmnivoiceModelConfig(o);
+  c.f5 = GetOfflineTtsF5ModelConfig(o);
 
   SHERPA_ONNX_ASSIGN_ATTR_INT32(num_threads, numThreads);
 

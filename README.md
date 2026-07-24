@@ -11,12 +11,6 @@ Copyright (c)  2026  Xiaomi Corporation
 
 </div>
 
-> Renamed from branch `omnivoice-tts` on 2026-07-24. If you cloned before then:
-> ```bash
-> git fetch --prune origin && git remote set-head origin -a
-> git branch -m master upstream 2>/dev/null || true
-> ```
-
 Upstream sherpa-onnx is the reference on-device audio-AI runtime — ASR, VAD,
 diarization, KWS, and a wide TTS surface. That project ships and supports
 bindings for a dozen languages and every platform under the sun.

@@ -1601,6 +1601,24 @@ static sherpa_onnx::OfflineTtsConfig GetOfflineTtsConfig(
   tts_config.model.omnivoice.seed =
       SHERPA_ONNX_OR(config->model.omnivoice.seed, -1);
 
+  // f5-tts
+  tts_config.model.f5.transformer =
+      SHERPA_ONNX_OR(config->model.f5.transformer, "");
+  tts_config.model.f5.vocoder = SHERPA_ONNX_OR(config->model.f5.vocoder, "");
+  tts_config.model.f5.tokens = SHERPA_ONNX_OR(config->model.f5.tokens, "");
+  tts_config.model.f5.data_dir =
+      SHERPA_ONNX_OR(config->model.f5.data_dir, "");
+  tts_config.model.f5.lexicon = SHERPA_ONNX_OR(config->model.f5.lexicon, "");
+  tts_config.model.f5.num_steps =
+      SHERPA_ONNX_OR(config->model.f5.num_steps, 32);
+  tts_config.model.f5.guidance_scale =
+      SHERPA_ONNX_OR(config->model.f5.guidance_scale, 2.0f);
+  tts_config.model.f5.sway_coef =
+      SHERPA_ONNX_OR(config->model.f5.sway_coef, -1.0f);
+  tts_config.model.f5.target_rms =
+      SHERPA_ONNX_OR(config->model.f5.target_rms, 0.1f);
+  tts_config.model.f5.seed = SHERPA_ONNX_OR(config->model.f5.seed, -1);
+
   tts_config.model.num_threads = SHERPA_ONNX_OR(config->model.num_threads, 1);
   tts_config.model.debug = config->model.debug;
   tts_config.model.provider = SHERPA_ONNX_OR(config->model.provider, "cpu");

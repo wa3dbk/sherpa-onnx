@@ -2407,12 +2407,37 @@ typedef struct SherpaOnnxOfflineTtsOmnivoiceModelConfig {
   int32_t seed;
 } SherpaOnnxOfflineTtsOmnivoiceModelConfig;
 
+/** @brief Configuration for an F5-TTS model. */
+typedef struct SherpaOnnxOfflineTtsF5ModelConfig {
+  /** Path to the F5-TTS DiT (flow-matching DiT). */
+  const char *transformer;
+  /** Path to the Vocos mel-to-waveform vocoder ONNX. */
+  const char *vocoder;
+  /** Path to tokens.txt (tab-separated `token<TAB>id`). */
+  const char *tokens;
+  /** espeak-ng data dir (phontab, phonindex, phondata, intonations). */
+  const char *data_dir;
+  /** Optional lexicon.txt for Chinese phonemization. */
+  const char *lexicon;
+  /** Euler ODE steps for flow-matching. Default 32. */
+  int32_t num_steps;
+  /** Classifier-free guidance weight. 0 disables CFG. Default 2.0. */
+  float guidance_scale;
+  /** Sway-sampling coefficient (F5's time-schedule warp).
+   *  -1.0 = F5 default; 0.0 = uniform. */
+  float sway_coef;
+  /** Target RMS for reference-audio normalization. Default 0.1. */
+  float target_rms;
+  /** RNG seed for initial gaussian noise. <0 => nondeterministic. */
+  int32_t seed;
+} SherpaOnnxOfflineTtsF5ModelConfig;
+
 /**
  * @brief Configuration shared by offline TTS models.
  *
  * Exactly one TTS model family should be configured. For example, set only one
  * of @c vits, @c matcha, @c kokoro, @c kitten, @c zipvoice, @c pocket,
- * @c supertonic, or @c omnivoice.
+ * @c supertonic, @c omnivoice, or @c f5.
  *
  * If multiple model families are configured at the same time, the
  * implementation will choose one of them, and which one is used is
@@ -2447,6 +2472,8 @@ typedef struct SherpaOnnxOfflineTtsModelConfig {
   SherpaOnnxOfflineTtsSupertonicModelConfig supertonic;
   /** OmniVoice configuration. */
   SherpaOnnxOfflineTtsOmnivoiceModelConfig omnivoice;
+  /** F5-TTS configuration. */
+  SherpaOnnxOfflineTtsF5ModelConfig f5;
 } SherpaOnnxOfflineTtsModelConfig;
 
 /**

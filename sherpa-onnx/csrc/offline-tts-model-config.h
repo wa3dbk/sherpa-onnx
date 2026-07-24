@@ -7,6 +7,7 @@
 
 #include <string>
 
+#include "sherpa-onnx/csrc/offline-tts-f5-model-config.h"
 #include "sherpa-onnx/csrc/offline-tts-kitten-model-config.h"
 #include "sherpa-onnx/csrc/offline-tts-kokoro-model-config.h"
 #include "sherpa-onnx/csrc/offline-tts-matcha-model-config.h"
@@ -28,6 +29,7 @@ struct OfflineTtsModelConfig {
   OfflineTtsPocketModelConfig pocket;
   OfflineTtsSupertonicModelConfig supertonic;
   OfflineTtsOmnivoiceModelConfig omnivoice;
+  OfflineTtsF5ModelConfig f5;
 
   int32_t num_threads = 1;
   bool debug = false;
@@ -43,6 +45,7 @@ struct OfflineTtsModelConfig {
                         const OfflineTtsPocketModelConfig &pocket,
                         const OfflineTtsSupertonicModelConfig &supertonic,
                         const OfflineTtsOmnivoiceModelConfig &omnivoice,
+                        const OfflineTtsF5ModelConfig &f5,
                         int32_t num_threads, bool debug,
                         const std::string &provider)
       : vits(vits),
@@ -53,6 +56,7 @@ struct OfflineTtsModelConfig {
         pocket(pocket),
         supertonic(supertonic),
         omnivoice(omnivoice),
+        f5(f5),
         num_threads(num_threads),
         debug(debug),
         provider(provider) {}
