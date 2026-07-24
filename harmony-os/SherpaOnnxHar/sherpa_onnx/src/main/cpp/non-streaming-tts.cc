@@ -70,6 +70,13 @@
     SHERPA_ONNX_DELETE_C_STR(c.model.supertonic.unicode_indexer);     \
     SHERPA_ONNX_DELETE_C_STR(c.model.supertonic.voice_style);         \
                                                                 \
+    SHERPA_ONNX_DELETE_C_STR(c.model.omnivoice.model);          \
+    SHERPA_ONNX_DELETE_C_STR(c.model.omnivoice.codec_encoder);  \
+    SHERPA_ONNX_DELETE_C_STR(c.model.omnivoice.codec_decoder);  \
+    SHERPA_ONNX_DELETE_C_STR(c.model.omnivoice.tokenizer_dir);  \
+    SHERPA_ONNX_DELETE_C_STR(c.model.omnivoice.prefix_model);   \
+    SHERPA_ONNX_DELETE_C_STR(c.model.omnivoice.target_model);   \
+                                                                \
     SHERPA_ONNX_DELETE_C_STR(c.model.provider);                 \
                                                                 \
     SHERPA_ONNX_DELETE_C_STR(c.rule_fsts);                      \
@@ -285,6 +292,33 @@ GetOfflineTtsSupertonicModelConfig(Napi::Object obj) {
   return c;
 }
 
+static SherpaOnnxOfflineTtsOmnivoiceModelConfig
+GetOfflineTtsOmnivoiceModelConfig(Napi::Object obj) {
+  SherpaOnnxOfflineTtsOmnivoiceModelConfig c;
+  memset(&c, 0, sizeof(c));
+
+  if (!obj.Has("omnivoice") || !obj.Get("omnivoice").IsObject()) {
+    return c;
+  }
+
+  Napi::Object o = obj.Get("omnivoice").As<Napi::Object>();
+
+  SHERPA_ONNX_ASSIGN_ATTR_STR(model, model);
+  SHERPA_ONNX_ASSIGN_ATTR_STR(codec_encoder, codecEncoder);
+  SHERPA_ONNX_ASSIGN_ATTR_STR(codec_decoder, codecDecoder);
+  SHERPA_ONNX_ASSIGN_ATTR_STR(tokenizer_dir, tokenizerDir);
+  SHERPA_ONNX_ASSIGN_ATTR_STR(prefix_model, prefixModel);
+  SHERPA_ONNX_ASSIGN_ATTR_STR(target_model, targetModel);
+  SHERPA_ONNX_ASSIGN_ATTR_INT32(num_steps, numSteps);
+  SHERPA_ONNX_ASSIGN_ATTR_FLOAT(t_shift, tShift);
+  SHERPA_ONNX_ASSIGN_ATTR_FLOAT(guidance_scale, guidanceScale);
+  SHERPA_ONNX_ASSIGN_ATTR_FLOAT(layer_penalty_factor, layerPenaltyFactor);
+  SHERPA_ONNX_ASSIGN_ATTR_FLOAT(position_temperature, positionTemperature);
+  SHERPA_ONNX_ASSIGN_ATTR_INT32(seed, seed);
+
+  return c;
+}
+
 static SherpaOnnxOfflineTtsModelConfig GetOfflineTtsModelConfig(
     Napi::Object obj) {
   SherpaOnnxOfflineTtsModelConfig c;
@@ -303,6 +337,7 @@ static SherpaOnnxOfflineTtsModelConfig GetOfflineTtsModelConfig(
   c.zipvoice = GetOfflineTtsZipvoiceModelConfig(o);
   c.pocket = GetOfflineTtsPocketModelConfig(o);
   c.supertonic = GetOfflineTtsSupertonicModelConfig(o);
+  c.omnivoice = GetOfflineTtsOmnivoiceModelConfig(o);
 
   SHERPA_ONNX_ASSIGN_ATTR_INT32(num_threads, numThreads);
 
