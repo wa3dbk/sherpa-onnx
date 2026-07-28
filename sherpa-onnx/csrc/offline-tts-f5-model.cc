@@ -27,6 +27,7 @@
 #include "sherpa-onnx/csrc/onnx-utils.h"
 #include "sherpa-onnx/csrc/ort-env.h"
 #include "sherpa-onnx/csrc/session.h"
+#include "sherpa-onnx/csrc/text-utils.h"
 
 namespace sherpa_onnx {
 
@@ -140,7 +141,7 @@ class OfflineTtsF5Model::Impl {
     GetOutputNames(sess_.get(), &output_names_, &output_names_ptr_);
 
     Ort::AllocatorWithDefaultOptions allocator;  // used in macro
-    Ort::ModelMetadata meta = sess_->GetModelMetadata();
+    Ort::ModelMetadata meta_data = sess_->GetModelMetadata();
 
     SHERPA_ONNX_READ_META_DATA_WITH_DEFAULT(meta_data_.version, "version", 1);
     SHERPA_ONNX_READ_META_DATA_WITH_DEFAULT(meta_data_.feat_dim, "feat_dim",
@@ -162,7 +163,7 @@ class OfflineTtsF5Model::Impl {
     if (config_.debug) {
       std::ostringstream os;
       os << "---f5 transformer---\n";
-      PrintModelMetadata(os, meta);
+      PrintModelMetadata(os, meta_data);
       os << "----------input names----------\n";
       for (size_t i = 0; i < input_names_.size(); ++i) {
         os << i << " " << input_names_[i] << "\n";
