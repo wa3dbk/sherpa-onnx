@@ -38,8 +38,7 @@ docs at <https://k2-fsa.github.io/sherpa/onnx/>.
 | **ChatterBox / Turbo** | LLaMA-backbone + S3 codec + HiFi-GAN | MIT | 📋 Planned | — |
 | everything from upstream (Piper VITS, Matcha, Kokoro, Kitten, Zipvoice, Pocket, Supertonic) | various | various | ✅ Inherited, unchanged | upstream docs |
 
-Roadmap and selection rationale live in [tests.md](tests.md) and the model
-comparison notes at the bottom of this file.
+The model comparison notes can be found at the bottom of this file.
 
 ---
 
@@ -252,8 +251,6 @@ Longer notes and background live next to the code:
   chunking, streaming, determinism, sample-rate handling.
 - [F5-TTS.md](F5-TTS.md) — Euler ODE loop, sway sampling, CFG, duration
   estimation, tokenizer notes.
-- [tests.md](tests.md) — 12-stage validation checklist to run on your cluster
-  after each build.
 - `sherpa-onnx/csrc/offline-tts-*-model.cc` — per-backend implementations.
   New backends should mirror these.
 
