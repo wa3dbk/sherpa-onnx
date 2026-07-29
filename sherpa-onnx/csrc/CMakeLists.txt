@@ -300,6 +300,7 @@ if(SHERPA_ONNX_ENABLE_TTS)
     offline-tts-indextts2-emotion-text-encoder.cc
     offline-tts-indextts2-frontend.cc
     offline-tts-indextts2-sampler.cc
+    offline-tts-indextts2-vocoder.cc
     offline-tts-frontend.cc
     offline-tts-impl.cc
     offline-tts-kitten-model-config.cc
