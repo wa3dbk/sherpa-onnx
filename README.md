@@ -34,7 +34,7 @@ docs at <https://k2-fsa.github.io/sherpa/onnx/>.
 |---|---|---|---|---|
 | **OmniVoice** | Qwen3-0.6B LM + Higgs-Audio-V2 codec, MaskGIT NAR | Apache 2.0 | ✅ Merged | [OMNIVOICE.md](OMNIVOICE.md) |
 | **F5-TTS** | Flow-matching DiT + Vocos vocoder | MIT | ✅ Merged | [F5-TTS.md](F5-TTS.md) |
-| **IndexTTS-2** | GPT-style LM + BigVGAN | Apache 2.0 | 📋 Planned | — |
+| **IndexTTS-2** | GPT-style LM + BigVGAN | Apache 2.0 | ✅ Merged | [INDEXTTS2.md](INDEXTTS2.md) |
 | **ChatterBox / Turbo** | LLaMA-backbone + S3 codec + HiFi-GAN | MIT | 📋 Planned | — |
 | everything from upstream (Piper VITS, Matcha, Kokoro, Kitten, Zipvoice, Pocket, Supertonic) | various | various | ✅ Inherited, unchanged | upstream docs |
 
@@ -76,7 +76,14 @@ OUT_DIR=./sherpa-onnx-f5-tts-base-24khz bash scripts/f5-tts/build_bundle.sh
 export BUNDLE_DIR=./sherpa-onnx-f5-tts-base-24khz
 ```
 
-For IndexTTS-2 / ChatterBox: bundle scripts land as those models are integrated
+For IndexTTS-2:
+
+```bash
+OUT_DIR=./sherpa-onnx-indextts2-base bash scripts/indextts2/build_bundle.sh
+export BUNDLE_DIR=./sherpa-onnx-indextts2-base
+```
+
+For ChatterBox: bundle scripts land as it is integrated
 (see [Model status](#model-status)).
 
 ### Try it — C++ (CLI)
