@@ -82,6 +82,15 @@
     SHERPA_ONNX_DELETE_C_STR(c.model.f5.data_dir);              \
     SHERPA_ONNX_DELETE_C_STR(c.model.f5.lexicon);               \
                                                                 \
+    SHERPA_ONNX_DELETE_C_STR(c.model.indextts2.lm);                  \
+    SHERPA_ONNX_DELETE_C_STR(c.model.indextts2.voice_encoder);       \
+    SHERPA_ONNX_DELETE_C_STR(c.model.indextts2.emotion_encoder);     \
+    SHERPA_ONNX_DELETE_C_STR(c.model.indextts2.emotion_text_encoder);\
+    SHERPA_ONNX_DELETE_C_STR(c.model.indextts2.vocoder);             \
+    SHERPA_ONNX_DELETE_C_STR(c.model.indextts2.tokens);              \
+    SHERPA_ONNX_DELETE_C_STR(c.model.indextts2.merges);              \
+    SHERPA_ONNX_DELETE_C_STR(c.model.indextts2.pinyin_table);        \
+                                                                \
     SHERPA_ONNX_DELETE_C_STR(c.model.provider);                 \
                                                                 \
     SHERPA_ONNX_DELETE_C_STR(c.rule_fsts);                      \
@@ -91,9 +100,13 @@
 #define SHERPA_ONNX_DELETE_GENERATION_C_STR(c)  \
   do {                                          \
     SHERPA_ONNX_DELETE_C_STR(c.reference_text); \
+    SHERPA_ONNX_DELETE_C_STR(c.emotion_text);   \
     SHERPA_ONNX_DELETE_C_STR(c.extra);          \
     if (c.reference_audio) {                    \
       delete[] c.reference_audio;               \
+    }                                           \
+    if (c.emotion_audio_samples) {              \
+      delete[] c.emotion_audio_samples;         \
     }                                           \
   } while (0)
 
@@ -113,6 +126,9 @@ static SherpaOnnxGenerationConfig GetGenerationConfig(Napi::Object o) {
   SHERPA_ONNX_ASSIGN_ATTR_INT32(num_steps, numSteps);
   SHERPA_ONNX_ASSIGN_ATTR_STR(reference_text, referenceText);
   SHERPA_ONNX_ASSIGN_ATTR_INT32(reference_sample_rate, referenceSampleRate);
+  SHERPA_ONNX_ASSIGN_ATTR_STR(emotion_text, emotionText);
+  SHERPA_ONNX_ASSIGN_ATTR_INT32(emotion_audio_sample_rate,
+                                emotionAudioSampleRate);
 
   if (o.Has("referenceAudio") && o.Get("referenceAudio").IsTypedArray()) {
     auto arr = o.Get("referenceAudio").As<Napi::Float32Array>();
@@ -124,6 +140,19 @@ static SherpaOnnxGenerationConfig GetGenerationConfig(Napi::Object o) {
 
       c.reference_audio = buf;
       c.reference_audio_len = n;
+    }
+  }
+
+  if (o.Has("emotionAudio") && o.Get("emotionAudio").IsTypedArray()) {
+    auto arr = o.Get("emotionAudio").As<Napi::Float32Array>();
+    int32_t n = arr.ElementLength();
+
+    if (n > 0) {
+      float *buf = new float[n];
+      std::copy(arr.Data(), arr.Data() + n, buf);
+
+      c.emotion_audio_samples = buf;
+      c.emotion_audio_num_samples = n;
     }
   }
 
@@ -349,6 +378,34 @@ static SherpaOnnxOfflineTtsF5ModelConfig GetOfflineTtsF5ModelConfig(
   return c;
 }
 
+static SherpaOnnxOfflineTtsIndexTts2ModelConfig
+GetOfflineTtsIndexTts2ModelConfig(Napi::Object obj) {
+  SherpaOnnxOfflineTtsIndexTts2ModelConfig c;
+  memset(&c, 0, sizeof(c));
+
+  if (!obj.Has("indextts2") || !obj.Get("indextts2").IsObject()) {
+    return c;
+  }
+
+  Napi::Object o = obj.Get("indextts2").As<Napi::Object>();
+
+  SHERPA_ONNX_ASSIGN_ATTR_STR(lm, lm);
+  SHERPA_ONNX_ASSIGN_ATTR_STR(voice_encoder, voiceEncoder);
+  SHERPA_ONNX_ASSIGN_ATTR_STR(emotion_encoder, emotionEncoder);
+  SHERPA_ONNX_ASSIGN_ATTR_STR(emotion_text_encoder, emotionTextEncoder);
+  SHERPA_ONNX_ASSIGN_ATTR_STR(vocoder, vocoder);
+  SHERPA_ONNX_ASSIGN_ATTR_STR(tokens, tokens);
+  SHERPA_ONNX_ASSIGN_ATTR_STR(merges, merges);
+  SHERPA_ONNX_ASSIGN_ATTR_STR(pinyin_table, pinyinTable);
+  SHERPA_ONNX_ASSIGN_ATTR_INT32(max_audio_tokens, maxAudioTokens);
+  SHERPA_ONNX_ASSIGN_ATTR_INT32(top_k, topK);
+  SHERPA_ONNX_ASSIGN_ATTR_FLOAT(top_p, topP);
+  SHERPA_ONNX_ASSIGN_ATTR_FLOAT(temperature, temperature);
+  SHERPA_ONNX_ASSIGN_ATTR_INT32(seed, seed);
+
+  return c;
+}
+
 static SherpaOnnxOfflineTtsModelConfig GetOfflineTtsModelConfig(
     Napi::Object obj) {
   SherpaOnnxOfflineTtsModelConfig c;
@@ -369,6 +426,7 @@ static SherpaOnnxOfflineTtsModelConfig GetOfflineTtsModelConfig(
   c.supertonic = GetOfflineTtsSupertonicModelConfig(o);
   c.omnivoice = GetOfflineTtsOmnivoiceModelConfig(o);
   c.f5 = GetOfflineTtsF5ModelConfig(o);
+  c.indextts2 = GetOfflineTtsIndexTts2ModelConfig(o);
 
   SHERPA_ONNX_ASSIGN_ATTR_INT32(num_threads, numThreads);
 
