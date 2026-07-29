@@ -9,6 +9,7 @@
 
 #include "sherpa-onnx/csrc/offline-tts-model-config.h"
 #include "sherpa-onnx/python/csrc/offline-tts-f5-model-config.h"
+#include "sherpa-onnx/python/csrc/offline-tts-indextts2-model-config.h"
 #include "sherpa-onnx/python/csrc/offline-tts-kitten-model-config.h"
 #include "sherpa-onnx/python/csrc/offline-tts-kokoro-model-config.h"
 #include "sherpa-onnx/python/csrc/offline-tts-matcha-model-config.h"
@@ -30,21 +31,30 @@ void PybindOfflineTtsModelConfig(py::module *m) {
   PybindOfflineTtsSupertonicModelConfig(m);
   PybindOfflineTtsOmnivoiceModelConfig(m);
   PybindOfflineTtsF5ModelConfig(m);
+  PybindOfflineTtsIndexTts2ModelConfig(m);
 
   using PyClass = OfflineTtsModelConfig;
 
   py::class_<PyClass>(*m, "OfflineTtsModelConfig")
       .def(py::init<>())
-      .def(py::init<const OfflineTtsVitsModelConfig &,
-                    const OfflineTtsMatchaModelConfig &,
-                    const OfflineTtsKokoroModelConfig &,
-                    const OfflineTtsZipvoiceModelConfig &,
-                    const OfflineTtsKittenModelConfig &,
-                    const OfflineTtsPocketModelConfig &,
-                    const OfflineTtsSupertonicModelConfig &,
-                    const OfflineTtsOmnivoiceModelConfig &,
-                    const OfflineTtsF5ModelConfig &, int32_t, bool,
-                    const std::string &>(),
+      .def(py::init([](const OfflineTtsVitsModelConfig &vits,
+                       const OfflineTtsMatchaModelConfig &matcha,
+                       const OfflineTtsKokoroModelConfig &kokoro,
+                       const OfflineTtsZipvoiceModelConfig &zipvoice,
+                       const OfflineTtsKittenModelConfig &kitten,
+                       const OfflineTtsPocketModelConfig &pocket,
+                       const OfflineTtsSupertonicModelConfig &supertonic,
+                       const OfflineTtsOmnivoiceModelConfig &omnivoice,
+                       const OfflineTtsF5ModelConfig &f5,
+                       const OfflineTtsIndexTts2ModelConfig &indextts2,
+                       int32_t num_threads, bool debug,
+                       const std::string &provider) {
+             OfflineTtsModelConfig c(vits, matcha, kokoro, zipvoice, kitten,
+                                     pocket, supertonic, omnivoice, f5,
+                                     num_threads, debug, provider);
+             c.indextts2 = indextts2;
+             return c;
+           }),
            py::arg("vits") = OfflineTtsVitsModelConfig{},
            py::arg("matcha") = OfflineTtsMatchaModelConfig{},
            py::arg("kokoro") = OfflineTtsKokoroModelConfig{},
@@ -54,6 +64,7 @@ void PybindOfflineTtsModelConfig(py::module *m) {
            py::arg("supertonic") = OfflineTtsSupertonicModelConfig{},
            py::arg("omnivoice") = OfflineTtsOmnivoiceModelConfig{},
            py::arg("f5") = OfflineTtsF5ModelConfig{},
+           py::arg("indextts2") = OfflineTtsIndexTts2ModelConfig{},
            py::arg("num_threads") = 1, py::arg("debug") = false,
            py::arg("provider") = "cpu")
       .def_readwrite("vits", &PyClass::vits)
@@ -65,6 +76,7 @@ void PybindOfflineTtsModelConfig(py::module *m) {
       .def_readwrite("supertonic", &PyClass::supertonic)
       .def_readwrite("omnivoice", &PyClass::omnivoice)
       .def_readwrite("f5", &PyClass::f5)
+      .def_readwrite("indextts2", &PyClass::indextts2)
       .def_readwrite("num_threads", &PyClass::num_threads)
       .def_readwrite("debug", &PyClass::debug)
       .def_readwrite("provider", &PyClass::provider)

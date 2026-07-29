@@ -37,6 +37,10 @@ static void PybindGenerationConfig(py::module *m) {
       .def_readwrite("reference_audio", &PyClass::reference_audio)
       .def_readwrite("reference_sample_rate", &PyClass::reference_sample_rate)
       .def_readwrite("reference_text", &PyClass::reference_text)
+      .def_readwrite("emotion_audio", &PyClass::emotion_audio)
+      .def_readwrite("emotion_audio_sample_rate",
+                     &PyClass::emotion_audio_sample_rate)
+      .def_readwrite("emotion_text", &PyClass::emotion_text)
       .def_readwrite("num_steps", &PyClass::num_steps)
       .def_readwrite("extra", &PyClass::extra)
       .def("__str__", &PyClass::ToString);

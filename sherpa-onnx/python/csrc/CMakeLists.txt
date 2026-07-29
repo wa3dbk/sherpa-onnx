@@ -78,6 +78,7 @@ endif()
 if(SHERPA_ONNX_ENABLE_TTS)
   list(APPEND srcs
     offline-tts-f5-model-config.cc
+    offline-tts-indextts2-model-config.cc
     offline-tts-kitten-model-config.cc
     offline-tts-kokoro-model-config.cc
     offline-tts-matcha-model-config.cc
