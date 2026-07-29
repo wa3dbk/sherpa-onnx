@@ -156,6 +156,12 @@ std::string GenerationConfig::ToString() const {
   os << ", num_steps=" << num_steps;
   os << ", reference_audio_len=" << reference_audio.size();
   os << ", reference_sample_rate=" << reference_sample_rate;
+  os << ", emotion_audio_len=" << emotion_audio.size();
+  os << ", emotion_audio_sample_rate=" << emotion_audio_sample_rate;
+
+  if (!emotion_text.empty()) {
+    os << ", emotion_text=\"" << emotion_text << "\"";
+  }
 
   if (!reference_text.empty()) {
     os << ", reference_text=\"" << reference_text << "\"";
