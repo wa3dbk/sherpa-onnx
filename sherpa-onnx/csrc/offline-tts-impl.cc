@@ -17,6 +17,7 @@
 #endif
 
 #include "sherpa-onnx/csrc/offline-tts-f5-impl.h"
+#include "sherpa-onnx/csrc/offline-tts-indextts2-impl.h"
 #include "sherpa-onnx/csrc/offline-tts-kitten-impl.h"
 #include "sherpa-onnx/csrc/offline-tts-kokoro-impl.h"
 #include "sherpa-onnx/csrc/offline-tts-matcha-impl.h"
@@ -61,6 +62,8 @@ std::unique_ptr<OfflineTtsImpl> OfflineTtsImpl::Create(
     return std::make_unique<OfflineTtsOmnivoiceImpl>(config);
   } else if (!config.model.f5.transformer.empty()) {
     return std::make_unique<OfflineTtsF5Impl>(config);
+  } else if (!config.model.indextts2.lm.empty()) {
+    return std::make_unique<OfflineTtsIndexTts2Impl>(config);
   }
 
   SHERPA_ONNX_LOGE("Please provide a tts model.");
@@ -90,6 +93,8 @@ std::unique_ptr<OfflineTtsImpl> OfflineTtsImpl::Create(
     return std::make_unique<OfflineTtsOmnivoiceImpl>(mgr, config);
   } else if (!config.model.f5.transformer.empty()) {
     return std::make_unique<OfflineTtsF5Impl>(mgr, config);
+  } else if (!config.model.indextts2.lm.empty()) {
+    return std::make_unique<OfflineTtsIndexTts2Impl>(mgr, config);
   }
 
   SHERPA_ONNX_LOGE("Please provide a tts model.");
