@@ -295,6 +295,7 @@ if(SHERPA_ONNX_ENABLE_TTS)
     offline-tts-f5-model-config.cc
     offline-tts-indextts2-model-config.cc
     offline-tts-f5-model.cc
+    offline-tts-indextts2-model.cc
     offline-tts-frontend.cc
     offline-tts-impl.cc
     offline-tts-kitten-model-config.cc
