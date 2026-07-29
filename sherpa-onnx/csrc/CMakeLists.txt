@@ -299,6 +299,7 @@ if(SHERPA_ONNX_ENABLE_TTS)
     offline-tts-indextts2-audio-encoder.cc
     offline-tts-indextts2-emotion-text-encoder.cc
     offline-tts-indextts2-frontend.cc
+    offline-tts-indextts2-sampler.cc
     offline-tts-frontend.cc
     offline-tts-impl.cc
     offline-tts-kitten-model-config.cc
@@ -861,6 +862,7 @@ if(SHERPA_ONNX_ENABLE_TESTS)
       offline-tts-f5-model-config-test.cc
       offline-tts-indextts2-model-config-test.cc
       offline-tts-indextts2-frontend-test.cc
+      offline-tts-indextts2-sampler-test.cc
     )
   endif()
 
