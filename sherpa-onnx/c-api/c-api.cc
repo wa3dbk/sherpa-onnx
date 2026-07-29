@@ -1619,6 +1619,34 @@ static sherpa_onnx::OfflineTtsConfig GetOfflineTtsConfig(
       SHERPA_ONNX_OR(config->model.f5.target_rms, 0.1f);
   tts_config.model.f5.seed = SHERPA_ONNX_OR(config->model.f5.seed, -1);
 
+  // indextts2
+  tts_config.model.indextts2.lm =
+      SHERPA_ONNX_OR(config->model.indextts2.lm, "");
+  tts_config.model.indextts2.voice_encoder =
+      SHERPA_ONNX_OR(config->model.indextts2.voice_encoder, "");
+  tts_config.model.indextts2.emotion_encoder =
+      SHERPA_ONNX_OR(config->model.indextts2.emotion_encoder, "");
+  tts_config.model.indextts2.emotion_text_encoder =
+      SHERPA_ONNX_OR(config->model.indextts2.emotion_text_encoder, "");
+  tts_config.model.indextts2.vocoder =
+      SHERPA_ONNX_OR(config->model.indextts2.vocoder, "");
+  tts_config.model.indextts2.tokens =
+      SHERPA_ONNX_OR(config->model.indextts2.tokens, "");
+  tts_config.model.indextts2.merges =
+      SHERPA_ONNX_OR(config->model.indextts2.merges, "");
+  tts_config.model.indextts2.pinyin_table =
+      SHERPA_ONNX_OR(config->model.indextts2.pinyin_table, "");
+  tts_config.model.indextts2.max_audio_tokens =
+      SHERPA_ONNX_OR(config->model.indextts2.max_audio_tokens, 2000);
+  tts_config.model.indextts2.top_k =
+      SHERPA_ONNX_OR(config->model.indextts2.top_k, 30);
+  tts_config.model.indextts2.top_p =
+      SHERPA_ONNX_OR(config->model.indextts2.top_p, 0.8f);
+  tts_config.model.indextts2.temperature =
+      SHERPA_ONNX_OR(config->model.indextts2.temperature, 0.8f);
+  tts_config.model.indextts2.seed =
+      SHERPA_ONNX_OR(config->model.indextts2.seed, -1);
+
   tts_config.model.num_threads = SHERPA_ONNX_OR(config->model.num_threads, 1);
   tts_config.model.debug = config->model.debug;
   tts_config.model.provider = SHERPA_ONNX_OR(config->model.provider, "cpu");
@@ -1719,6 +1747,21 @@ static const SherpaOnnxGeneratedAudio *SherpaOnnxOfflineTtsGenerateInternal(
   cfg.sid = config->sid;
 
   cfg.reference_sample_rate = config->reference_sample_rate;
+
+  if (config->emotion_audio_samples) {
+    if (config->emotion_audio_num_samples <= 0) {
+      SHERPA_ONNX_LOGE("Invalid emotion audio num samples: %d",
+                       config->emotion_audio_num_samples);
+      return nullptr;
+    }
+
+    cfg.emotion_audio.assign(
+        config->emotion_audio_samples,
+        config->emotion_audio_samples + config->emotion_audio_num_samples);
+  }
+
+  cfg.emotion_audio_sample_rate = config->emotion_audio_sample_rate;
+  cfg.emotion_text = SHERPA_ONNX_OR(config->emotion_text, "");
 
   cfg.reference_text = SHERPA_ONNX_OR(config->reference_text, "");
   cfg.num_steps = SHERPA_ONNX_OR(config->num_steps, 5);

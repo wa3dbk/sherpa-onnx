@@ -2432,6 +2432,36 @@ typedef struct SherpaOnnxOfflineTtsF5ModelConfig {
   int32_t seed;
 } SherpaOnnxOfflineTtsF5ModelConfig;
 
+/** @brief Configuration for an IndexTTS-2 model. */
+SHERPA_ONNX_API typedef struct SherpaOnnxOfflineTtsIndexTts2ModelConfig {
+  /** Path to the GPT-style AR LM ONNX (dual-mode: prefix + step). */
+  const char *lm;
+  /** Path to the voice_encoder ONNX (reference wav -> speaker embedding). */
+  const char *voice_encoder;
+  /** Path to the emotion_encoder ONNX (emo wav -> emotion embedding). */
+  const char *emotion_encoder;
+  /** Path to the emotion_text_encoder ONNX (text -> emotion embedding). */
+  const char *emotion_text_encoder;
+  /** Path to the BigVGAN-family vocoder ONNX (audio tokens -> waveform). */
+  const char *vocoder;
+  /** Path to tokens.txt (tab-separated `token<TAB>id`). */
+  const char *tokens;
+  /** Path to BPE merges.txt (HF format). */
+  const char *merges;
+  /** Path to pinyin_table.txt (offline CJK-char -> pinyin lookup). */
+  const char *pinyin_table;
+  /** Upper bound on generated audio tokens per sentence. Default 2000. */
+  int32_t max_audio_tokens;
+  /** AR sampler top-k. Default 30. */
+  int32_t top_k;
+  /** AR sampler top-p. Default 0.8. */
+  float top_p;
+  /** AR sampler temperature. Default 0.8. */
+  float temperature;
+  /** RNG seed for the AR sampler. <0 => nondeterministic. Default -1. */
+  int32_t seed;
+} SherpaOnnxOfflineTtsIndexTts2ModelConfig;
+
 /**
  * @brief Configuration shared by offline TTS models.
  *
@@ -2474,6 +2504,8 @@ typedef struct SherpaOnnxOfflineTtsModelConfig {
   SherpaOnnxOfflineTtsOmnivoiceModelConfig omnivoice;
   /** F5-TTS configuration. */
   SherpaOnnxOfflineTtsF5ModelConfig f5;
+  /** IndexTTS-2 configuration. */
+  SherpaOnnxOfflineTtsIndexTts2ModelConfig indextts2;
 } SherpaOnnxOfflineTtsModelConfig;
 
 /**
@@ -2784,6 +2816,14 @@ typedef struct SherpaOnnxGenerationConfig {
   int32_t reference_audio_len;
   /** Sample rate of @c reference_audio. */
   int32_t reference_sample_rate;
+  /** Optional emotion reference audio (IndexTTS-2). */
+  const float *emotion_audio_samples;
+  /** Length of @c emotion_audio_samples in samples. */
+  int32_t emotion_audio_num_samples;
+  /** Sample rate of @c emotion_audio_samples. */
+  int32_t emotion_audio_sample_rate;
+  /** Optional natural-language emotion description (IndexTTS-2). */
+  const char *emotion_text;
   /** Optional reference text associated with @c reference_audio. */
   const char *reference_text;
   /** Optional number of flow-matching steps. */
