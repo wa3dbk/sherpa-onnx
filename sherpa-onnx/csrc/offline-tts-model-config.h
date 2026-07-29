@@ -8,6 +8,7 @@
 #include <string>
 
 #include "sherpa-onnx/csrc/offline-tts-f5-model-config.h"
+#include "sherpa-onnx/csrc/offline-tts-indextts2-model-config.h"
 #include "sherpa-onnx/csrc/offline-tts-kitten-model-config.h"
 #include "sherpa-onnx/csrc/offline-tts-kokoro-model-config.h"
 #include "sherpa-onnx/csrc/offline-tts-matcha-model-config.h"
@@ -30,6 +31,7 @@ struct OfflineTtsModelConfig {
   OfflineTtsSupertonicModelConfig supertonic;
   OfflineTtsOmnivoiceModelConfig omnivoice;
   OfflineTtsF5ModelConfig f5;
+  OfflineTtsIndexTts2ModelConfig indextts2;
 
   int32_t num_threads = 1;
   bool debug = false;

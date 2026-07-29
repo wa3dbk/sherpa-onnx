@@ -20,6 +20,7 @@ void OfflineTtsModelConfig::Register(ParseOptions *po) {
   supertonic.Register(po);
   omnivoice.Register(po);
   f5.Register(po);
+  indextts2.Register(po);
 
   po->Register("num-threads", &num_threads,
                "Number of threads to run the neural network");
@@ -73,6 +74,10 @@ bool OfflineTtsModelConfig::Validate() const {
     return f5.Validate();
   }
 
+  if (!indextts2.lm.empty()) {
+    return indextts2.Validate();
+  }
+
   SHERPA_ONNX_LOGE("Please provide exactly one tts model.");
 
   return false;
@@ -91,6 +96,7 @@ std::string OfflineTtsModelConfig::ToString() const {
   os << "supertonic=" << supertonic.ToString() << ", ";
   os << "omnivoice=" << omnivoice.ToString() << ", ";
   os << "f5=" << f5.ToString() << ", ";
+  os << "indextts2=" << indextts2.ToString() << ", ";
   os << "num_threads=" << num_threads << ", ";
   os << "debug=" << (debug ? "True" : "False") << ", ";
   os << "provider=\"" << provider << "\")";
